@@ -6,7 +6,7 @@ An end-to-end production-ready system for automated classification and routing o
 
 This project demonstrates a comprehensive MLOps pipeline that:
 
-- **Classifies** client inquiries using intelligent keyword-based NLP models (category, sentiment, urgency)
+- **Classifies** client inquiries using BERT-based NLP models (category, sentiment, urgency)
 - **Routes** inquiries to appropriate departments and consultants based on intelligent business rules
 - **Orchestrates** data pipelines and model retraining with Apache Airflow (fully functional DAGs)
 - **Monitors** system performance and model metrics with real Prometheus metrics and Grafana dashboards
@@ -26,7 +26,7 @@ This project demonstrates a comprehensive MLOps pipeline that:
 ┌─────────────────────────────────────────────────────────────┐
 │                  FastAPI Application                         │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │ Text Processor│→│  NLP Models  │→│ Routing Engine│      │
+│  │ Text Processor│→│  BERT Models │→│ Routing Engine│      │
 │  │              │  │  - Category  │  │              │      │
 │  │              │  │  - Sentiment │  │              │      │
 │  │              │  │  - Urgency   │  │              │      │
@@ -198,6 +198,37 @@ curl "http://localhost:8000/api/v1/inquiries/{inquiry_id}"
 ```bash
 curl "http://localhost:8000/api/v1/stats"
 ```
+
+## 🛠️ Technology Stack
+
+### **Machine Learning & NLP**
+- **BERT Models**: Facebook BART-large-MNLI for zero-shot classification
+- **RoBERTa**: Cardiff NLP Twitter RoBERTa for sentiment analysis
+- **Transformers**: HuggingFace transformers library
+- **PyTorch**: Deep learning framework for model inference
+
+### **Backend & API**
+- **FastAPI**: Modern Python web framework for APIs
+- **SQLAlchemy**: Python SQL toolkit and ORM
+- **PostgreSQL**: Primary database for inquiries and predictions
+- **Redis**: Caching and session storage
+
+### **Orchestration & Workflow**
+- **Apache Airflow**: Workflow orchestration and scheduling
+- **Docker**: Containerization platform
+- **Docker Compose**: Multi-container orchestration
+
+### **Monitoring & Observability**
+- **Prometheus**: Metrics collection and alerting
+- **Grafana**: Metrics visualization and dashboards
+- **MLflow**: Model versioning and experiment tracking
+- **Streamlit**: Real-time monitoring dashboard
+
+### **Cloud & Infrastructure**
+- **Kubernetes**: Container orchestration
+- **Helm**: Kubernetes package manager
+- **Istio**: Service mesh for traffic management
+- **ArgoCD**: GitOps continuous deployment
 
 ## 🔄 Airflow DAGs
 
@@ -556,8 +587,10 @@ Created as a demonstration of MLOps and intelligent automation capabilities.
 
 ## 🙏 Acknowledgments
 
-- HuggingFace Transformers for pre-trained models
-- Apache Airflow for workflow orchestration
-- FastAPI for the API framework
-- Streamlit for the monitoring dashboard
+- **HuggingFace Transformers** for BERT and RoBERTa pre-trained models
+- **Facebook AI** for BART-large-MNLI zero-shot classification model
+- **Cardiff NLP** for Twitter RoBERTa sentiment analysis model
+- **Apache Airflow** for workflow orchestration
+- **FastAPI** for the API framework
+- **Streamlit** for the monitoring dashboard
 

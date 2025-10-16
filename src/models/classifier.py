@@ -1,29 +1,53 @@
 """
-Intelligent inquiry classifier that analyzes text content.
+BERT-based inquiry classifier using Hugging Face transformers.
 """
-import re
+import torch
+from transformers import pipeline, AutoTokenizer, AutoModelForSequenceClassification
 from typing import Tuple, Dict, Any
+import logging
+from .model_cache import get_cached_classifier
+
+logger = logging.getLogger(__name__)
 
 class InquiryClassifier:
-    """Intelligent classifier that analyzes text content for keywords."""
+    """BERT-based classifier using zero-shot classification."""
     
     def __init__(self):
         self.categories = [
             "technical_support", "billing", "sales", "hr", "legal", "product_feedback"
         ]
         
-        # Keyword mappings for each category
+        # Initialize the zero-shot classifier using cache
+        try:
+            self.classifier = get_cached_classifier()
+            if self.classifier is None:
+                logger.warning("🔄 Failed to get cached classifier, initializing new one")
+                self.classifier = pipeline(
+                    "zero-shot-classification",
+                    model="facebook/bart-large-mnli",
+                    device=0 if torch.cuda.is_available() else -1
+                )
+            logger.info("✅ BERT-based classifier initialized successfully")
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize BERT classifier: {e}")
+            # Fallback to keyword-based classifier
+            self.classifier = None
+            self._init_keyword_fallback()
+    
+    def _init_keyword_fallback(self):
+        """Initialize keyword-based fallback classifier."""
+        logger.warning("🔄 Falling back to keyword-based classifier")
         self.keywords = {
             "technical_support": [
                 "login", "password", "technical", "bug", "error", "issue", "problem", 
                 "not working", "broken", "crash", "slow", "freeze", "troubleshoot",
-                "support", "help", "fix", "repair", "technical", "system", "software",
+                "support", "help", "fix", "repair", "system", "software",
                 "hardware", "connection", "network", "server", "database", "api"
             ],
             "billing": [
                 "bill", "invoice", "payment", "charge", "cost", "price", "fee", "refund",
                 "subscription", "plan", "upgrade", "downgrade", "billing", "account",
-                "credit", "debit", "transaction", "receipt", "money", "cost", "expensive"
+                "credit", "debit", "transaction", "receipt", "money", "expensive"
             ],
             "sales": [
                 "buy", "purchase", "order", "quote", "demo", "trial", "pricing", "features",
@@ -48,10 +72,60 @@ class InquiryClassifier:
         }
     
     def predict(self, text: str, include_all_scores: bool = False) -> Tuple[str, float, Dict[str, float]]:
-        """Predict category based on text content analysis."""
+        """Predict category using BERT or keyword-based fallback."""
         if not text:
             return "technical_support", 0.5, {}
         
+        # Use BERT classifier if available
+        if self.classifier is not None:
+            try:
+                return self._predict_with_bert(text, include_all_scores)
+            except Exception as e:
+                logger.error(f"❌ BERT prediction failed: {e}")
+                logger.warning("🔄 Falling back to keyword-based prediction")
+                return self._predict_with_keywords(text, include_all_scores)
+        else:
+            return self._predict_with_keywords(text, include_all_scores)
+    
+    def _predict_with_bert(self, text: str, include_all_scores: bool = False) -> Tuple[str, float, Dict[str, float]]:
+        """Predict using BERT zero-shot classification."""
+        # Prepare candidate labels with descriptions
+        candidate_labels = [
+            "technical support and troubleshooting issues",
+            "billing and payment related questions", 
+            "sales and product information inquiries",
+            "human resources and employment matters",
+            "legal and compliance questions",
+            "product feedback and feature requests"
+        ]
+        
+        # Run zero-shot classification
+        result = self.classifier(text, candidate_labels)
+        
+        # Map result to our category names
+        label_mapping = {
+            "technical support and troubleshooting issues": "technical_support",
+            "billing and payment related questions": "billing",
+            "sales and product information inquiries": "sales", 
+            "human resources and employment matters": "hr",
+            "legal and compliance questions": "legal",
+            "product feedback and feature requests": "product_feedback"
+        }
+        
+        category = label_mapping.get(result['labels'][0], "technical_support")
+        confidence = result['scores'][0]
+        
+        if include_all_scores:
+            all_scores = {}
+            for i, label in enumerate(result['labels']):
+                cat = label_mapping.get(label, "technical_support")
+                all_scores[cat] = result['scores'][i]
+            return category, confidence, all_scores
+        
+        return category, confidence, {}
+    
+    def _predict_with_keywords(self, text: str, include_all_scores: bool = False) -> Tuple[str, float, Dict[str, float]]:
+        """Fallback keyword-based prediction."""
         text_lower = text.lower()
         
         # Calculate scores for each category based on keyword matches
@@ -75,7 +149,7 @@ class InquiryClassifier:
             category = max(category_scores, key=category_scores.get)
             max_matches = category_scores[category]
             
-            # Calculate confidence based on keyword density and uniqueness
+            # Calculate confidence based on keyword density
             confidence = min(0.95, 0.6 + (max_matches / max(1, len(text.split())) * 0.3))
         
         if include_all_scores:

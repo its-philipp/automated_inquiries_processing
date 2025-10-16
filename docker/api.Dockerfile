@@ -2,19 +2,28 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies including ML libraries
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
     git \
+    gcc \
+    g++ \
+    libopenblas-dev \
+    liblapack-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy dependency files
 COPY pyproject.toml ./
 
-# Install uv and dependencies
+# Install uv and dependencies with cache for faster builds
 RUN pip install --no-cache-dir uv && \
     uv pip install --system -r pyproject.toml
+
+# Set environment variables for transformers
+ENV TRANSFORMERS_CACHE=/app/.cache/transformers
+ENV HF_HOME=/app/.cache/huggingface
+ENV TOKENIZERS_PARALLELISM=false
 
 # Copy application code
 COPY src ./src

@@ -14,9 +14,10 @@ automated_processing_of_client_inquiries/
 │   ├── 📂 api/                      # FastAPI application
 │   │   └── main.py                  # API endpoints & middleware
 │   ├── 📂 models/                   # NLP models
-│   │   ├── classifier.py            # Intelligent keyword-based classifier
-│   │   ├── sentiment.py             # Sentiment analyzer
+│   │   ├── classifier.py            # BERT-based zero-shot classifier
+│   │   ├── sentiment.py             # RoBERTa-based sentiment analyzer
 │   │   ├── urgency.py               # Urgency detector
+│   │   └── model_cache.py           # Model caching and management
 │   │   └── real_classifier.py       # Alternative scikit-learn implementation
 │   ├── 📂 preprocessing/            # Text processing
 │   │   └── text_processor.py        # Cleaning & normalization
@@ -127,11 +128,12 @@ automated_processing_of_client_inquiries/
 ### 1. NLP Classification Pipeline ✅
 
 **Components:**
-- ✅ BERT-based category classifier (DistilBERT/BART zero-shot)
-- ✅ RoBERTa sentiment analyzer
+- ✅ BERT-based category classifier (Facebook BART-large-MNLI zero-shot)
+- ✅ RoBERTa sentiment analyzer (Cardiff NLP Twitter RoBERTa)
 - ✅ Rule-based urgency detector
 - ✅ Text preprocessing pipeline
 - ✅ Model inference with confidence scores
+- ✅ Model caching and management system
 
 **Categories Supported:**
 - Technical Support
@@ -412,7 +414,7 @@ automated_processing_of_client_inquiries/
 - **API Endpoints**: 6
 - **Airflow DAGs**: 3
 - **Database Tables**: 5
-- **NLP Models**: 3
+- **NLP Models**: 3 (BERT-based classification, RoBERTa sentiment, rule-based urgency)
 - **Prometheus Metrics**: 15+
 - **Test Files**: 4
 - **Documentation Files**: 8

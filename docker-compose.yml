@@ -52,6 +52,8 @@ services:
       - ./src:/app/src
       - ./config:/app/config
       - ./models:/app/models
+      - transformers_cache:/app/.cache/transformers
+      - huggingface_cache:/app/.cache/huggingface
     depends_on:
       postgres:
         condition: service_healthy
@@ -60,6 +62,12 @@ services:
     networks:
       - inquiry_network
     command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
 
   # MLflow Tracking Server
   mlflow:
@@ -242,6 +250,8 @@ volumes:
   airflow_logs:
   prometheus_data:
   grafana_data:
+  transformers_cache:
+  huggingface_cache:
 
 networks:
   inquiry_network:

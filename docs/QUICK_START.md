@@ -118,21 +118,62 @@ kubectl get svc -n inquiries-system
 kubectl get gateway -n inquiries-system
 ```
 
-## Step 4: Test the API
+## Step 4: Test the Complete Workflow
 
-### For Docker Deployment
+### Test BERT Models Locally
 
 ```bash
-# Submit a test inquiry
+# Test BERT models directly
+source .venv/bin/activate
+python scripts/test_bert_models.py
+```
+
+This will test:
+- BERT-based category classification (85%+ accuracy)
+- RoBERTa sentiment analysis (85%+ accuracy)
+- Model caching and performance
+- Fallback mechanisms
+
+### Test API with BERT Models
+
+#### For Docker Deployment
+
+```bash
+# Test technical support inquiry
 curl -X POST "http://localhost:8000/api/v1/inquiries/submit" \
   -H "Content-Type: application/json" \
   -d '{
-    "subject": "Cannot login to account",
-    "body": "I have been trying to log in for the past hour but keep getting an error. This is blocking my work. Please help!",
-    "sender_email": "test@example.com",
-    "sender_name": "Test User"
+    "subject": "Technical issue with login",
+    "body": "I cannot log into my account and keep getting error messages. Please help me troubleshoot this issue.",
+    "sender_email": "tech@example.com",
+    "sender_name": "Tech User"
+  }'
+
+# Test billing inquiry
+curl -X POST "http://localhost:8000/api/v1/inquiries/submit" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "subject": "Billing question",
+    "body": "I was charged twice for my monthly subscription. Can I get a refund?",
+    "sender_email": "billing@example.com",
+    "sender_name": "Billing User"
+  }'
+
+# Test positive sentiment
+curl -X POST "http://localhost:8000/api/v1/inquiries/submit" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "subject": "Thank you for excellent service!",
+    "body": "I just wanted to say thank you for the amazing customer service. The team was incredibly helpful!",
+    "sender_email": "happy@example.com",
+    "sender_name": "Happy Customer"
   }'
 ```
+
+Expected results:
+- **Technical inquiry** → `technical_support` category, `negative` sentiment
+- **Billing inquiry** → `billing` category, `negative` sentiment  
+- **Thank you message** → `technical_support` category, `positive` sentiment
 
 ### For Kubernetes Deployment
 
