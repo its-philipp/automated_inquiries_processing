@@ -1,0 +1,154 @@
+# Routing rules for inquiry classification and department assignment
+
+# Department mapping from categories
+category_to_department:
+  technical_support: technical_support
+  billing: finance
+  sales: sales
+  hr: hr
+  legal: legal
+  product_feedback: product_management
+
+# Priority scoring weights
+priority_weights:
+  urgency:
+    critical: 40
+    high: 30
+    medium: 20
+    low: 10
+  sentiment:
+    negative: 30
+    neutral: 20
+    positive: 10
+  category:
+    legal: 15
+    billing: 10
+    technical_support: 10
+    sales: 8
+    hr: 8
+    product_feedback: 5
+
+# Escalation rules
+escalation_rules:
+  - name: critical_negative
+    conditions:
+      urgency: [critical]
+      sentiment: [negative]
+    action:
+      department: escalation
+      priority_boost: 20
+      reason: "Critical urgency with negative sentiment requires immediate escalation"
+  
+  - name: billing_urgent
+    conditions:
+      category: [billing]
+      urgency: [critical, high]
+    action:
+      department: finance
+      priority_boost: 15
+      reason: "Urgent billing issues need priority handling"
+  
+  - name: technical_critical
+    conditions:
+      category: [technical_support]
+      urgency: [critical]
+    action:
+      department: technical_support
+      priority_boost: 18
+      reason: "Critical technical issues may affect service availability"
+  
+  - name: legal_urgent
+    conditions:
+      category: [legal]
+      urgency: [critical, high]
+    action:
+      department: legal
+      priority_boost: 25
+      reason: "Urgent legal matters require immediate attention"
+  
+  - name: high_negative
+    conditions:
+      urgency: [high]
+      sentiment: [negative]
+    action:
+      priority_boost: 12
+      reason: "High urgency with negative sentiment needs quick response"
+
+# Consultant assignment strategies
+consultant_assignment:
+  technical_support:
+    strategy: round_robin  # round_robin, skill_based, load_balanced
+    consultants:
+      - name: "Tech Team A"
+        skills: [authentication, database, api]
+      - name: "Tech Team B"
+        skills: [frontend, mobile, sync]
+      - name: "Tech Team C"
+        skills: [infrastructure, deployment, security]
+  
+  finance:
+    strategy: round_robin
+    consultants:
+      - name: "Finance Team A"
+        skills: [billing, invoicing, refunds]
+      - name: "Finance Team B"
+        skills: [subscriptions, payments, pricing]
+  
+  sales:
+    strategy: load_balanced
+    consultants:
+      - name: "Sales Rep A"
+        skills: [enterprise, partnerships]
+      - name: "Sales Rep B"
+        skills: [smb, trials]
+      - name: "Sales Rep C"
+        skills: [volume_licensing, custom_solutions]
+  
+  hr:
+    strategy: round_robin
+    consultants:
+      - name: "HR Specialist A"
+        skills: [benefits, leave, payroll]
+      - name: "HR Specialist B"
+        skills: [policies, compliance, training]
+  
+  legal:
+    strategy: skill_based
+    consultants:
+      - name: "Legal Team A"
+        skills: [gdpr, privacy, data_protection]
+      - name: "Legal Team B"
+        skills: [contracts, terms, licensing]
+  
+  product_management:
+    strategy: round_robin
+    consultants:
+      - name: "Product Manager A"
+        skills: [features, roadmap]
+      - name: "Product Manager B"
+        skills: [ux, feedback, improvements]
+  
+  escalation:
+    strategy: skill_based
+    consultants:
+      - name: "Senior Manager"
+        skills: [all]
+      - name: "Director of Support"
+        skills: [all]
+
+# Business hours and SLA
+sla_config:
+  business_hours:
+    start: 9  # 9 AM
+    end: 17   # 5 PM
+    timezone: "UTC"
+  
+  response_time_targets:  # in minutes
+    critical: 15
+    high: 60
+    medium: 240
+    low: 1440  # 24 hours
+  
+  escalation_threshold:
+    priority_score: 70  # Auto-escalate if priority score >= 70
+
