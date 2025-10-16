@@ -40,14 +40,14 @@ The monitoring stack consists of:
 Track cumulative values that only increase:
 
 ```promql
-# Total HTTP requests
-http_requests_total
+# Total HTTP requests (actual metric name)
+http_request_duration_seconds_count
 
 # Total inquiries processed
-inquiries_processed_total
+inquiry_processing_duration_seconds_count
 
 # Total model predictions
-model_predictions_total
+model_inferences_total
 ```
 
 #### Gauges
@@ -122,57 +122,45 @@ rate(inquiry_category_total[1h])
 
 Dashboards are automatically provisioned from `monitoring/grafana/dashboards/`.
 
-#### 1. Pipeline Overview Dashboard
+#### 1. Inquiry Processing Pipeline Overview
 
-**Purpose**: High-level system health and performance
+**Purpose**: Complete pipeline monitoring with real-time data
 
 **Panels**:
-- Request rate (requests/second)
-- Error rate percentage
-- 95th percentile latency
-- Active connections
-- Service health status
+- Inquiry submissions count (`http_request_duration_seconds_count{endpoint="/api/v1/inquiries/submit"}`)
+- Inquiries processed (`inquiry_processing_duration_seconds_count`)
+- Routing decisions by department (`routing_decisions_total`)
+- Model inference statistics (`model_inferences_total`)
+- Processing duration over time (`rate(inquiry_processing_duration_seconds_count[5m])`)
 
-**Refresh Rate**: 30 seconds
+**Refresh Rate**: 5 seconds
 
 #### 2. Model Performance Dashboard
 
-**Purpose**: ML model performance and accuracy
+**Purpose**: BERT model performance and prediction analytics
 
 **Panels**:
-- Model inference latency
-- Prediction confidence distribution
-- Category prediction accuracy
-- Sentiment classification accuracy
-- Urgency detection accuracy
+- Model inferences by type (`model_inferences_total`)
+- Classifier predictions (`model_inferences_total{model_name="classifier"}`)
+- Sentiment analysis results (positive/neutral/negative distribution)
+- Urgency detection breakdown (critical/high/medium/low)
+- Category distribution (technical_support, billing, sales, hr, legal, product_feedback)
+- Model inference rate over time (`rate(model_inferences_total[5m])`)
 
-**Refresh Rate**: 1 minute
+**Refresh Rate**: 5 seconds
 
-#### 3. Business Metrics Dashboard
+#### 3. System Health Dashboard
 
-**Purpose**: Business KPIs and operational metrics
-
-**Panels**:
-- Inquiry volume over time
-- Category distribution (pie chart)
-- Department routing distribution
-- Escalation rate trend
-- Average priority score
-
-**Refresh Rate**: 5 minutes
-
-#### 4. System Health Dashboard
-
-**Purpose**: Infrastructure and resource monitoring
+**Purpose**: Infrastructure and service health monitoring
 
 **Panels**:
-- CPU usage by service
-- Memory usage by service
-- Disk usage
-- Database connection pool
-- Network traffic
+- API health status (`up{job="inquiry_api"}`)
+- Prometheus health (`up{job="prometheus"}`)
+- HTTP response codes (`http_request_duration_seconds_count`)
+- Service uptime (`up`)
+- Request rate over time (`rate(http_request_duration_seconds_count[5m])`)
 
-**Refresh Rate**: 30 seconds
+**Refresh Rate**: 5 seconds
 
 ### Custom Dashboard Creation
 
@@ -202,7 +190,7 @@ Dashboards are automatically provisioned from `monitoring/grafana/dashboards/`.
 #### High Error Rate
 ```yaml
 - alert: HighErrorRate
-  expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+  expr: rate(http_request_duration_seconds_count{status=~"5.."}[5m]) / rate(http_request_duration_seconds_count[5m]) > 0.05
   for: 5m
   labels:
     severity: critical

@@ -281,12 +281,23 @@ Key metrics tracked:
 
 ### Grafana Dashboards
 
-Pre-configured dashboards:
+Pre-configured dashboards with real-time data:
 
-1. **Pipeline Overview**: Request rates, latency percentiles, success rates
-2. **Model Performance**: Confidence distributions, prediction accuracy
-3. **Business Metrics**: Category/department distribution, escalation trends
-4. **System Health**: CPU, memory, database connections
+1. **Inquiry Processing Pipeline Overview**: 
+   - Inquiry submissions count and processing duration
+   - Routing decisions by department (technical_support, finance, sales, hr, legal, product_management)
+   - Model inference statistics and real-time processing graphs
+
+2. **Model Performance Dashboard**:
+   - BERT model inferences by type (classifier/sentiment/urgency)
+   - Sentiment analysis results (positive/neutral/negative distribution)
+   - Urgency detection breakdown (critical/high/medium/low)
+   - Category classification results and inference rate over time
+
+3. **System Health Dashboard**:
+   - API and Prometheus health status monitoring
+   - HTTP response code distribution (200/201/4xx/5xx)
+   - Service uptime and request rate over time
 
 ### Alerts
 

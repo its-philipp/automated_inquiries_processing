@@ -205,6 +205,9 @@ Open your browser and visit:
 - **Airflow UI**: http://localhost:8080 (login: admin/admin)
 - **MLflow UI**: http://localhost:5000
 - **Grafana**: http://localhost:3000 (login: admin/admin)
+  - Inquiry Processing Pipeline Overview
+  - Model Performance Dashboard  
+  - System Health Dashboard
 - **Prometheus**: http://localhost:9090
 
 ### For Kubernetes Deployment
