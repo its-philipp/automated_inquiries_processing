@@ -8,40 +8,30 @@ from airflow.providers.postgres.hooks.postgres import PostgresHook
 import sys
 from pathlib import Path
 
-# Mock implementations for demo (simplified for Airflow)
-print("Using mock implementations for demo")
+# Import real implementations
+import sys
+sys.path.append('/opt/airflow/src')
 
-class InquiryClassifier:
-    def predict(self, text, include_all_scores=False):
-        import random
-        categories = ["technical_support", "billing", "sales", "hr", "legal", "product_feedback"]
-        return random.choice(categories), 0.85, {cat: 0.1 for cat in categories}
+from models.classifier import InquiryClassifier
+from models.sentiment import SentimentAnalyzer  
+from models.urgency import UrgencyDetector
+from routing.router import RoutingEngine
+from schemas import PredictionResult, RoutingDecision, Department, InquiryCategory, UrgencyLevel, SentimentType
+import yaml
+import os
 
-class SentimentAnalyzer:
-    def predict(self, text, include_all_scores=False):
-        import random
-        sentiments = ["positive", "neutral", "negative"]
-        return random.choice(sentiments), 0.80, {sent: 0.2 for sent in sentiments}
+print("Using real BERT models and routing logic")
 
-class UrgencyDetector:
-    def predict(self, text, include_all_scores=False):
-        import random
-        urgency_levels = ["low", "medium", "high", "critical"]
-        return random.choice(urgency_levels), 0.75, {level: 0.15 for level in urgency_levels}
-
-class RoutingEngine:
-    def route(self, inquiry_id, prediction):
-        import random
-        departments = ["technical_support", "billing", "sales", "hr", "legal"]
-        consultants = ["Alice Johnson", "Bob Smith", "Carol Davis", "David Wilson"]
-        return type('RoutingDecision', (), {
-            'inquiry_id': inquiry_id,
-            'department': random.choice(departments),
-            'assigned_consultant': random.choice(consultants),
-            'priority_score': random.uniform(1.0, 5.0),
-            'escalated': random.choice([True, False]),
-            'routing_reason': 'Demo routing decision'
-        })()
+# Load routing configuration
+def load_routing_config():
+    """Load routing configuration from YAML file."""
+    config_path = '/opt/airflow/config/routing_rules.yaml'
+    if os.path.exists(config_path):
+        with open(config_path, 'r') as f:
+            return yaml.safe_load(f)
+    else:
+        print("Warning: routing_rules.yaml not found, using defaults")
+        return {}
 
 class TextProcessor:
     def process(self, text):
@@ -140,7 +130,7 @@ def load_unprocessed_inquiries(**context):
 
 
 def classify_inquiries(**context):
-    """Classify inquiries using ML models."""
+    """Classify inquiries using real BERT models."""
     # Pull inquiries from XCom
     inquiries = context['task_instance'].xcom_pull(
         task_ids='load_unprocessed_inquiries',
@@ -151,7 +141,7 @@ def classify_inquiries(**context):
         print("No inquiries to classify")
         return 0
     
-    # Initialize models
+    # Initialize real models
     text_processor = TextProcessor()
     classifier = InquiryClassifier()
     sentiment_analyzer = SentimentAnalyzer()
@@ -166,10 +156,10 @@ def classify_inquiries(**context):
             inquiry['body']
         )
         
-        # Classify
-        category, cat_conf, _ = classifier.predict(combined_text)
-        sentiment, sent_conf, _ = sentiment_analyzer.predict(combined_text)
-        urgency, urg_conf, _ = urgency_detector.predict(combined_text)
+        # Classify using real BERT models
+        category, cat_conf, cat_scores = classifier.predict(combined_text, include_all_scores=True)
+        sentiment, sent_conf, sent_scores = sentiment_analyzer.predict(combined_text, include_all_scores=True)
+        urgency, urg_conf, urg_scores = urgency_detector.predict(combined_text, include_all_scores=True)
         
         predictions.append({
             'inquiry_id': inquiry['id'],
@@ -179,9 +169,14 @@ def classify_inquiries(**context):
             'sentiment_confidence': sent_conf,
             'urgency': urgency,
             'urgency_confidence': urg_conf,
+            'all_scores': {
+                'category_scores': cat_scores,
+                'sentiment_scores': sent_scores,
+                'urgency_scores': urg_scores
+            }
         })
     
-    print(f"Classified {len(predictions)} inquiries")
+    print(f"Classified {len(predictions)} inquiries using BERT models")
     
     # Push to XCom
     context['task_instance'].xcom_push(key='predictions', value=predictions)
@@ -189,7 +184,7 @@ def classify_inquiries(**context):
 
 
 def route_inquiries(**context):
-    """Route inquiries to departments."""
+    """Route inquiries using real routing logic."""
     # Pull predictions from XCom
     predictions = context['task_instance'].xcom_pull(
         task_ids='classify_inquiries',
@@ -200,49 +195,40 @@ def route_inquiries(**context):
         print("No predictions to route")
         return 0
     
+    # Load routing configuration
+    routing_config = load_routing_config()
+    
     # Initialize routing engine
     routing_engine = RoutingEngine()
     
     routing_decisions = []
     
-    # Mock PredictionResult class
-    class PredictionResult:
-        def __init__(self, inquiry_id, category, category_confidence, sentiment, sentiment_confidence, urgency, urgency_confidence, model_versions=None):
-            self.inquiry_id = inquiry_id
-            self.category = category
-            self.category_confidence = category_confidence
-            self.sentiment = sentiment
-            self.sentiment_confidence = sentiment_confidence
-            self.urgency = urgency
-            self.urgency_confidence = urgency_confidence
-            self.model_versions = model_versions or {}
-    
     for pred in predictions:
-        # Create prediction result object
+        # Create prediction result object using proper enums
         prediction_result = PredictionResult(
             inquiry_id=pred['inquiry_id'],
-            category=pred['category'],  # Use string directly
+            category=getattr(InquiryCategory, pred['category'].upper()),
             category_confidence=pred['category_confidence'],
-            sentiment=pred['sentiment'],  # Use string directly
+            sentiment=getattr(SentimentType, pred['sentiment'].upper()),
             sentiment_confidence=pred['sentiment_confidence'],
-            urgency=pred['urgency'],  # Use string directly
+            urgency=getattr(UrgencyLevel, pred['urgency'].upper()),
             urgency_confidence=pred['urgency_confidence'],
-            model_versions={'classifier': 'v1.0', 'sentiment': 'v1.0', 'urgency': 'v1.0'},
+            model_versions={'classifier': 'bert-v1.0', 'sentiment': 'roberta-v1.0', 'urgency': 'bert-v1.0'},
         )
         
-        # Route
+        # Route using real routing engine
         routing = routing_engine.route(pred['inquiry_id'], prediction_result)
         
         routing_decisions.append({
             'inquiry_id': pred['inquiry_id'],
-            'department': routing.department,  # Use string directly
+            'department': routing.department.value,
             'assigned_consultant': routing.assigned_consultant,
             'priority_score': routing.priority_score,
             'escalated': routing.escalated,
             'routing_reason': routing.routing_reason,
         })
     
-    print(f"Routed {len(routing_decisions)} inquiries")
+    print(f"Routed {len(routing_decisions)} inquiries using real routing logic")
     
     # Push to XCom
     context['task_instance'].xcom_push(key='routing_decisions', value=routing_decisions)
@@ -300,7 +286,7 @@ def save_predictions_and_routing(**context):
             pred['sentiment_confidence'],
             pred['urgency'],
             pred['urgency_confidence'],
-            '{"classifier": "v1.0", "sentiment": "v1.0", "urgency": "v1.0"}',
+            '{"classifier": "facebook/bart-large-mnli", "sentiment": "cardiffnlp/twitter-roberta-base-sentiment-latest", "urgency": "bert-urgency-v1.0"}',
         ))
     
     # Save routing decisions

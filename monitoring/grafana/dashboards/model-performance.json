@@ -1,0 +1,116 @@
+{
+  "title": "Model Performance Dashboard",
+  "panels": [
+    {
+      "title": "Model Inferences by Type",
+      "type": "piechart",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "targets": [
+        {
+          "expr": "model_inferences_total",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Classifier Predictions",
+      "type": "table",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "targets": [
+        {
+          "expr": "model_inferences_total{model_name=\"classifier\"}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Sentiment Analysis Results",
+      "type": "stat",
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 8},
+      "targets": [
+        {
+          "expr": "model_inferences_total{model_name=\"sentiment\", prediction_value=\"positive\"}",
+          "refId": "A"
+        },
+        {
+          "expr": "model_inferences_total{model_name=\"sentiment\", prediction_value=\"neutral\"}",
+          "refId": "B"
+        },
+        {
+          "expr": "model_inferences_total{model_name=\"sentiment\", prediction_value=\"negative\"}",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "title": "Urgency Detection Results",
+      "type": "stat",
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 8},
+      "targets": [
+        {
+          "expr": "model_inferences_total{model_name=\"urgency\", prediction_value=\"critical\"}",
+          "refId": "A"
+        },
+        {
+          "expr": "model_inferences_total{model_name=\"urgency\", prediction_value=\"high\"}",
+          "refId": "B"
+        },
+        {
+          "expr": "model_inferences_total{model_name=\"urgency\", prediction_value=\"medium\"}",
+          "refId": "C"
+        },
+        {
+          "expr": "model_inferences_total{model_name=\"urgency\", prediction_value=\"low\"}",
+          "refId": "D"
+        }
+      ]
+    },
+    {
+      "title": "Category Distribution",
+      "type": "stat",
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 8},
+      "targets": [
+        {
+          "expr": "model_inferences_total{model_name=\"classifier\", prediction_value=\"technical_support\"}",
+          "refId": "A"
+        },
+        {
+          "expr": "model_inferences_total{model_name=\"classifier\", prediction_value=\"billing\"}",
+          "refId": "B"
+        },
+        {
+          "expr": "model_inferences_total{model_name=\"classifier\", prediction_value=\"sales\"}",
+          "refId": "C"
+        },
+        {
+          "expr": "model_inferences_total{model_name=\"classifier\", prediction_value=\"hr\"}",
+          "refId": "D"
+        },
+        {
+          "expr": "model_inferences_total{model_name=\"classifier\", prediction_value=\"legal\"}",
+          "refId": "E"
+        },
+        {
+          "expr": "model_inferences_total{model_name=\"classifier\", prediction_value=\"product_feedback\"}",
+          "refId": "F"
+        }
+      ]
+    },
+    {
+      "title": "Model Inference Rate Over Time",
+      "type": "graph",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+      "targets": [
+        {
+          "expr": "rate(model_inferences_total[5m])",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refresh": "5s"
+}

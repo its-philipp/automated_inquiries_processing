@@ -13,6 +13,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -120,7 +121,8 @@ services:
       - "8081:8080"
     command: >
       bash -c "airflow db init &&
-               airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com || true &&
+               sleep 5 &&
+               airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com 2>/dev/null || echo 'User may already exist' &&
                airflow webserver"
     depends_on:
       postgres:
@@ -243,6 +245,53 @@ services:
     networks:
       - inquiry_network
     command: streamlit run inquiry_monitoring_dashboard.py --server.port=8501 --server.address=0.0.0.0
+
+  # MLflow Data Population Service
+  mlflow-setup:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    container_name: inquiry_mlflow_setup
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+    volumes:
+      - ./scripts:/app/scripts
+      - ./src:/app/src
+    depends_on:
+      mlflow:
+        condition: service_started
+    networks:
+      - inquiry_network
+    command: >
+      bash -c "sleep 10 &&
+               python scripts/setup_mlflow_simple.py &&
+               python scripts/setup_bert_tracking.py &&
+               echo 'MLflow data population complete'"
+    restart: "no"
+
+  # Grafana Dashboard Setup Service
+  grafana-setup:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    container_name: inquiry_grafana_setup
+    environment:
+      - GRAFANA_URL=http://grafana:3000
+      - GRAFANA_USERNAME=admin
+      - GRAFANA_PASSWORD=admin
+    volumes:
+      - ./scripts:/app/scripts
+      - ./monitoring:/app/monitoring
+    depends_on:
+      grafana:
+        condition: service_started
+    networks:
+      - inquiry_network
+    command: >
+      bash -c "sleep 15 &&
+               python scripts/setup_grafana_dashboards.py &&
+               echo 'Grafana dashboard setup complete'"
+    restart: "no"
 
 volumes:
   postgres_data:

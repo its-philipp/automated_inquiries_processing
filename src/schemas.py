@@ -4,7 +4,7 @@ Pydantic schemas for data validation throughout the pipeline.
 from datetime import datetime
 from enum import Enum
 from typing import Optional, Dict, Any
-from pydantic import BaseModel, Field, EmailStr, field_validator
+from pydantic import BaseModel, Field, EmailStr, validator
 
 
 class InquiryCategory(str, Enum):
@@ -52,7 +52,7 @@ class IncomingInquiry(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
     
-    @field_validator('body', 'subject')
+    @validator('body', 'subject')
     @classmethod
     def strip_whitespace(cls, v: str) -> str:
         """Strip leading/trailing whitespace."""
