@@ -9,8 +9,10 @@ import time
 def create_simple_experiments():
     """Create sample experiments in MLflow with metrics only."""
     
-    # Set MLflow tracking URI
-    mlflow.set_tracking_uri("http://localhost:5001")
+    print("🚀 Starting MLflow setup...")
+    print("📊 Setting MLflow tracking URI...")
+    mlflow.set_tracking_uri("http://mlflow:5000")
+    print("✅ MLflow tracking URI set to http://mlflow:5000")
     
     # Create experiments
     experiments = [
@@ -20,7 +22,9 @@ def create_simple_experiments():
         "model_comparison"
     ]
     
-    for exp_name in experiments:
+    print(f"\n📁 Creating {len(experiments)} experiments...")
+    for i, exp_name in enumerate(experiments, 1):
+        print(f"🔄 [{i}/{len(experiments)}] Creating experiment: {exp_name}")
         try:
             exp_id = mlflow.create_experiment(exp_name)
             print(f"✅ Created experiment: {exp_name} (ID: {exp_id})")
@@ -29,6 +33,7 @@ def create_simple_experiments():
                 print(f"⚠️  Experiment {exp_name} already exists")
             else:
                 print(f"❌ Error creating experiment {exp_name}: {e}")
+        time.sleep(0.5)  # Small delay for better UX
     
     # Generate sample runs with metrics
     np.random.seed(42)

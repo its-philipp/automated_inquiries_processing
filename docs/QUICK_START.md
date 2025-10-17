@@ -22,30 +22,40 @@ Get the Inquiry Automation Pipeline up and running in minutes!
 
 ### Option 1: Local Development with Docker
 
-#### Step 1: Run Setup Script
+#### Step 1: Install uv and Start Services
 
 ```bash
 # Clone the repository (if not already done)
 cd automated_inquiries_processing
 
-# Run the automated setup
-./scripts/setup.sh
-```
+# Install uv (Python package manager)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+source ~/.bashrc
 
-This script will:
-- Check prerequisites
-- Create `.env` file
-- Install dependencies
-- Generate mock data
-- Pull and build Docker images
-
-#### Step 2: Start Services
-
-```bash
+# Start all services
 docker-compose up -d
+
+# Check service status
+docker-compose ps
 ```
+
+The system automatically sets up:
+- ✅ PostgreSQL databases (airflow, mlflow)
+- ✅ Airflow admin user (admin/admin)
+- ✅ MLflow experiments with sample data
+- ✅ Grafana dashboards (3 working dashboards)
+- ✅ BERT/RoBERTa models with progress feedback
 
 Wait about 30-60 seconds for all services to initialize.
+
+#### Step 2: Access Services
+
+- **FastAPI Swagger Docs**: http://localhost:8000/docs
+- **Streamlit Dashboard**: http://localhost:8501
+- **Airflow UI**: http://localhost:8081 (admin/admin)
+- **MLflow UI**: http://localhost:5001
+- **Grafana**: http://localhost:3000 (admin/admin)
+- **Prometheus**: http://localhost:9090
 
 #### Step 3: Verify Services
 

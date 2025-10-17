@@ -68,25 +68,13 @@ This project demonstrates a comprehensive MLOps pipeline that:
 ```bash
 git clone <repository>
 cd automated_inquiries_processing
-
-# Copy environment template
-cp env.example .env
-
-# Edit .env with your configuration
-nano .env
 ```
 
-2. **Generate mock data:**
+2. **Install uv (Python package manager):**
 
 ```bash
-# Install uv if not already installed
-pip install uv
-
-# Sync dependencies
-uv sync
-
-# Generate sample data
-python data/generate_mock_data.py
+curl -LsSf https://astral.sh/uv/install.sh | sh
+source ~/.bashrc
 ```
 
 3. **Start services with Docker Compose:**
@@ -102,14 +90,45 @@ docker-compose ps
 docker-compose logs -f api
 ```
 
+### First-Time Setup Features
+
+The system automatically sets up everything you need:
+
+- ✅ **PostgreSQL databases** (airflow, mlflow) created automatically
+- ✅ **Airflow admin user** (admin/admin) created on first startup
+- ✅ **MLflow experiments** populated with realistic BERT model data
+- ✅ **Grafana dashboards** (3 working dashboards) imported automatically
+- ✅ **BERT/RoBERTa models** loaded with progress feedback
+- ✅ **No duplicate dashboards** on restart (smart detection)
+
 4. **Access the services:**
 
 - **FastAPI Swagger Docs**: http://localhost:8000/docs
 - **Streamlit Dashboard**: http://localhost:8501
 - **Airflow UI**: http://localhost:8081 (admin/admin)
 - **MLflow UI**: http://localhost:5001
-- **Prometheus**: http://localhost:9090
 - **Grafana**: http://localhost:3000 (admin/admin)
+- **Prometheus**: http://localhost:9090
+
+### Available Grafana Dashboards
+
+Pre-configured dashboards with real-time data:
+
+1. **Inquiry Processing Pipeline Overview**:
+   - Inquiry submissions count and processing duration
+   - Routing decisions by department (technical_support, finance, sales, hr, legal, product_management)
+   - Model inference statistics and real-time processing graphs
+
+2. **Model Performance Dashboard**:
+   - BERT model inferences by type (classifier/sentiment/urgency)
+   - Sentiment analysis results (positive/neutral/negative distribution)
+   - Urgency detection breakdown (critical/high/medium/low)
+   - Category classification results and inference rate over time
+
+3. **System Health Dashboard**:
+   - API and Prometheus health status monitoring
+   - HTTP response code distribution (200/201/4xx/5xx)
+   - Service uptime and request rate over time
 
 5. **Test the complete workflow:**
 

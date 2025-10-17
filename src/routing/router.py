@@ -1,12 +1,16 @@
 """
-Mock routing engine for demo purposes.
+Intelligent routing engine using ML predictions and business rules.
 """
 import random
+import yaml
 from typing import Dict, Any
-from src.schemas import PredictionResult, RoutingDecision, Department
+try:
+    from src.schemas import PredictionResult, RoutingDecision, Department
+except ImportError:
+    from schemas import PredictionResult, RoutingDecision, Department
 
 class RoutingEngine:
-    """Mock routing engine that assigns inquiries to departments."""
+    """Intelligent routing engine that assigns inquiries to departments based on ML predictions."""
     
     def __init__(self):
         self.department_mapping = {

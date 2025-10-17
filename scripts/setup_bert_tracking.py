@@ -15,8 +15,10 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
 def create_bert_model_experiments():
     """Create realistic BERT model experiments in MLflow."""
     
-    # Set MLflow tracking URI
-    mlflow.set_tracking_uri("http://localhost:5001")
+    print("🤖 Starting BERT model tracking setup...")
+    print("📊 Setting MLflow tracking URI...")
+    mlflow.set_tracking_uri("http://mlflow:5000")
+    print("✅ MLflow tracking URI set to http://mlflow:5000")
     
     # Create BERT-specific experiments
     experiments = [
@@ -26,7 +28,9 @@ def create_bert_model_experiments():
         "inference_metrics"
     ]
     
-    for exp_name in experiments:
+    print(f"\n📁 Creating {len(experiments)} BERT experiments...")
+    for i, exp_name in enumerate(experiments, 1):
+        print(f"🔄 [{i}/{len(experiments)}] Creating experiment: {exp_name}")
         try:
             exp_id = mlflow.create_experiment(exp_name)
             print(f"✅ Created experiment: {exp_name} (ID: {exp_id})")
@@ -35,6 +39,7 @@ def create_bert_model_experiments():
                 print(f"⚠️  Experiment {exp_name} already exists")
             else:
                 print(f"❌ Error creating experiment {exp_name}: {e}")
+        time.sleep(0.5)  # Small delay for better UX
     
     # Generate realistic BERT model runs
     random.seed(42)

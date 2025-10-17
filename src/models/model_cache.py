@@ -47,15 +47,16 @@ class ModelCache:
         """Get or create the zero-shot classifier."""
         if 'classifier' not in self._models:
             try:
-                logger.info("🔄 Loading BERT zero-shot classifier...")
+                print("🔄 Loading BERT zero-shot classifier...")
+                print("📥 This may take a moment as we download the model...")
                 self._models['classifier'] = pipeline(
                     "zero-shot-classification",
                     model="facebook/bart-large-mnli",
                     device=0 if torch.cuda.is_available() else -1
                 )
-                logger.info("✅ BERT classifier loaded successfully")
+                print("✅ BERT classifier loaded successfully")
             except Exception as e:
-                logger.error(f"❌ Failed to load BERT classifier: {e}")
+                print(f"❌ Failed to load BERT classifier: {e}")
                 return None
         
         return self._models['classifier']
@@ -64,18 +65,34 @@ class ModelCache:
         """Get or create the sentiment analyzer."""
         if 'sentiment' not in self._models:
             try:
-                logger.info("🔄 Loading RoBERTa sentiment analyzer...")
+                print("🔄 Loading RoBERTa sentiment analyzer...")
+                print("📥 This may take a moment as we download the model...")
                 self._models['sentiment'] = pipeline(
                     "sentiment-analysis",
                     model="cardiffnlp/twitter-roberta-base-sentiment-latest",
                     device=0 if torch.cuda.is_available() else -1
                 )
-                logger.info("✅ RoBERTa sentiment analyzer loaded successfully")
+                print("✅ RoBERTa sentiment analyzer loaded successfully")
             except Exception as e:
                 logger.error(f"❌ Failed to load RoBERTa sentiment analyzer: {e}")
                 return None
         
-        return self._models['sentiment']
+    def get_urgency_detector(self) -> Optional[pipeline]:
+        """Get or create the urgency detector."""
+        if 'urgency' not in self._models:
+            try:
+                logger.info("🔄 Loading BERT urgency detector...")
+                self._models['urgency'] = pipeline(
+                    "zero-shot-classification",
+                    model="facebook/bart-large-mnli",
+                    device=0 if torch.cuda.is_available() else -1
+                )
+                logger.info("✅ BERT urgency detector loaded successfully")
+            except Exception as e:
+                logger.error(f"❌ Failed to load BERT urgency detector: {e}")
+                return None
+        
+        return self._models['urgency']
     
     def clear_cache(self):
         """Clear all cached models."""
@@ -116,3 +133,8 @@ def get_cached_classifier():
 def get_cached_sentiment_analyzer():
     """Get cached sentiment analyzer with LRU caching."""
     return model_cache.get_sentiment_analyzer()
+
+@lru_cache(maxsize=1)
+def get_cached_urgency_detector():
+    """Get cached urgency detector with LRU caching."""
+    return model_cache.get_urgency_detector()

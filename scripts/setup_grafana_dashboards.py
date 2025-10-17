@@ -81,18 +81,44 @@ def create_datasource(base_url="http://grafana:3000", username="admin", password
         print(f"❌ Error creating datasource: {e}")
         return False
 
+def dashboard_exists(dashboard_title, base_url="http://grafana:3000", username="admin", password="admin"):
+    """Check if a dashboard already exists."""
+    try:
+        response = requests.get(
+            f"{base_url}/api/search?type=dash-db",
+            auth=(username, password),
+            timeout=10
+        )
+        if response.status_code == 200:
+            dashboards = response.json()
+            for dashboard in dashboards:
+                if dashboard.get('title') == dashboard_title:
+                    return True
+        return False
+    except requests.exceptions.RequestException:
+        return False
+
 def import_dashboard(dashboard_file, base_url="http://grafana:3000", username="admin", password="admin"):
-    """Import a dashboard from JSON file."""
-    print(f"Importing dashboard: {dashboard_file}")
+    """Import a dashboard from JSON file if it doesn't already exist."""
+    print(f"Checking dashboard: {dashboard_file}")
     
     try:
         with open(dashboard_file, 'r') as f:
             dashboard_data = json.load(f)
         
+        dashboard_title = dashboard_data.get('title', 'Unknown')
+        
+        # Check if dashboard already exists
+        if dashboard_exists(dashboard_title, base_url, username, password):
+            print(f"✅ Dashboard '{dashboard_title}' already exists, skipping import")
+            return True
+        
+        print(f"📊 Importing new dashboard: {dashboard_title}")
+        
         # Prepare dashboard for import
         dashboard_payload = {
             "dashboard": dashboard_data,
-            "overwrite": True,  # Overwrite if dashboard already exists
+            "overwrite": False,  # Don't overwrite existing dashboards
             "inputs": []  # No inputs needed for our dashboards
         }
         
@@ -106,7 +132,6 @@ def import_dashboard(dashboard_file, base_url="http://grafana:3000", username="a
         
         if response.status_code == 200:
             result = response.json()
-            dashboard_title = dashboard_data.get('title', 'Unknown')
             print(f"✅ Successfully imported dashboard: {dashboard_title}")
             return True
         else:
