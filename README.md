@@ -18,20 +18,20 @@ This project demonstrates a comprehensive MLOps pipeline that:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     Client Inquiries                         │
-│                  (Email, Tickets, API)                       │
+│                     Client Inquiries                        │
+│                  (Email, Tickets, API)                      │
 └────────────────────────┬────────────────────────────────────┘
                          │
                          ▼
-┌─────────────────────────────────────────────────────────────┐
-│                  FastAPI Application                         │
+┌────────────────────────────────────────────────────────────┐
+│                  FastAPI Application                       │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │ Text Processor│→│  BERT Models │→│ Routing Engine│      │
+│  │Text Processor│→ │  BERT Models │→ │Routing Engine│      │
 │  │              │  │  - Category  │  │              │      │
 │  │              │  │  - Sentiment │  │              │      │
 │  │              │  │  - Urgency   │  │              │      │
 │  └──────────────┘  └──────────────┘  └──────────────┘      │
-└────────────────────────┬────────────────────────────────────┘
+└────────────────────────┬───────────────────────────────────┘
                          │
           ┌──────────────┼──────────────┐
           │              │              │
@@ -45,10 +45,10 @@ This project demonstrates a comprehensive MLOps pipeline that:
                          │
                          ▼
            ┌─────────────────────────┐
-           │   Apache Airflow         │
-           │  - Data Ingestion        │
-           │  - Batch Classification  │
-           │  - Model Retraining      │
+           │   Apache Airflow        │
+           │  - Data Ingestion       │
+           │  - Batch Classification │
+           │  - Model Retraining     │
            └─────────────────────────┘
 ```
 

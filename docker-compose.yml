@@ -173,6 +173,7 @@ services:
       - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://postgres:postgres@postgres:5432/airflow
       - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
       - AIRFLOW__CORE__FERNET_KEY=''
+      - MACOS_OPTIMIZATION=true  # Enable macOS memory optimization
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./src:/opt/airflow/src

@@ -5,6 +5,7 @@ import torch
 from transformers import pipeline
 from typing import Tuple, Dict, Any
 import logging
+import os
 from .model_cache import get_cached_urgency_detector
 
 logger = logging.getLogger(__name__)
@@ -17,17 +18,34 @@ class UrgencyDetector:
         
         # Initialize the urgency detection pipeline using cache
         try:
+            # Check if running on macOS host - force keyword-based fallback for memory optimization
+            is_macos = (
+                os.environ.get('HOST_OS') == 'Darwin' or 
+                'mac' in os.environ.get('HOSTNAME', '').lower() or
+                os.environ.get('MACOS_OPTIMIZATION', '').lower() == 'true'
+            )
+            
+            if is_macos:
+                logger.warning("🔄 macOS host detected - using keyword-based urgency detector for memory optimization")
+                self.detector = None
+                self._init_keyword_fallback()
+                logger.info("✅ Keyword-based urgency detector initialized successfully")
+                return
+            
             self.detector = get_cached_urgency_detector()
             if self.detector is None:
                 logger.warning("🔄 Failed to get cached urgency detector, initializing new one")
                 self.detector = pipeline(
                     "zero-shot-classification",
-                    model="facebook/bart-large-mnli",
-                    device=0 if torch.cuda.is_available() else -1
+                    model="facebook/bart-base-mnli",  # Smaller model (400MB vs 1.6GB)
+                    device=0 if torch.cuda.is_available() else -1,
+                    max_length=512,  # Limit input length to reduce memory usage
+                    batch_size=1  # Process one at a time to reduce memory usage
                 )
             logger.info("✅ BERT-based urgency detector initialized successfully")
         except Exception as e:
             logger.error(f"❌ Failed to initialize BERT urgency detector: {e}")
+            logger.warning("🔄 Falling back to keyword-based urgency detector for macOS compatibility")
             # Fallback to keyword-based detector
             self.detector = None
             self._init_keyword_fallback()

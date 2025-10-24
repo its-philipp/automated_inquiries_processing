@@ -5,6 +5,7 @@ import torch
 from transformers import pipeline
 from typing import Tuple, Dict, Any
 import logging
+import os
 from .model_cache import get_cached_sentiment_analyzer
 
 logger = logging.getLogger(__name__)
@@ -17,18 +18,34 @@ class SentimentAnalyzer:
         
         # Initialize the sentiment analysis pipeline using cache
         try:
+            # Check if running on macOS host - force keyword-based fallback for memory optimization
+            is_macos = (
+                os.environ.get('HOST_OS') == 'Darwin' or 
+                'mac' in os.environ.get('HOSTNAME', '').lower() or
+                os.environ.get('MACOS_OPTIMIZATION', '').lower() == 'true'
+            )
+            
+            if is_macos:
+                logger.warning("🔄 macOS host detected - using keyword-based sentiment analyzer for memory optimization")
+                self.analyzer = None
+                logger.info("✅ Keyword-based sentiment analyzer initialized successfully")
+                return
+            
             self.analyzer = get_cached_sentiment_analyzer()
             if self.analyzer is None:
                 logger.warning("🔄 Failed to get cached sentiment analyzer, initializing new one")
                 self.analyzer = pipeline(
                     "sentiment-analysis",
-                    model="cardiffnlp/twitter-roberta-base-sentiment-latest",
-                    device=0 if torch.cuda.is_available() else -1
+                    model="cardiffnlp/twitter-roberta-base-sentiment",  # Smaller model (500MB vs 1GB+)
+                    device=0 if torch.cuda.is_available() else -1,
+                    max_length=512,  # Limit input length to reduce memory usage
+                    batch_size=1  # Process one at a time to reduce memory usage
                 )
             logger.info("✅ RoBERTa sentiment analyzer initialized successfully")
         except Exception as e:
             logger.error(f"❌ Failed to initialize RoBERTa sentiment analyzer: {e}")
-            # Fallback to mock sentiment analyzer
+            logger.warning("🔄 Falling back to keyword-based sentiment analyzer for macOS compatibility")
+            # Fallback to keyword-based analyzer
             self.analyzer = None
             logger.warning("🔄 Falling back to mock sentiment analyzer")
     

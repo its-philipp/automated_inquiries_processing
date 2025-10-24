@@ -5,6 +5,7 @@ import torch
 from transformers import pipeline, AutoTokenizer, AutoModelForSequenceClassification
 from typing import Tuple, Dict, Any
 import logging
+import os
 from .model_cache import get_cached_classifier
 
 logger = logging.getLogger(__name__)
@@ -19,17 +20,35 @@ class InquiryClassifier:
         
         # Initialize the zero-shot classifier using cache
         try:
+            # Check if running on macOS host - force keyword-based fallback for memory optimization
+            # Docker containers run Linux, so we detect macOS via environment or hostname
+            is_macos = (
+                os.environ.get('HOST_OS') == 'Darwin' or 
+                'mac' in os.environ.get('HOSTNAME', '').lower() or
+                os.environ.get('MACOS_OPTIMIZATION', '').lower() == 'true'
+            )
+            
+            if is_macos:
+                logger.warning("🔄 macOS host detected - using keyword-based classifier for memory optimization")
+                self.classifier = None
+                self._init_keyword_fallback()
+                logger.info("✅ Keyword-based classifier initialized successfully")
+                return
+            
             self.classifier = get_cached_classifier()
             if self.classifier is None:
                 logger.warning("🔄 Failed to get cached classifier, initializing new one")
                 self.classifier = pipeline(
                     "zero-shot-classification",
-                    model="facebook/bart-large-mnli",
-                    device=0 if torch.cuda.is_available() else -1
+                    model="facebook/bart-base-mnli",  # Smaller model (400MB vs 1.6GB)
+                    device=0 if torch.cuda.is_available() else -1,
+                    max_length=512,  # Limit input length to reduce memory usage
+                    batch_size=1  # Process one at a time to reduce memory usage
                 )
             logger.info("✅ BERT-based classifier initialized successfully")
         except Exception as e:
             logger.error(f"❌ Failed to initialize BERT classifier: {e}")
+            logger.warning("🔄 Falling back to keyword-based classifier for macOS compatibility")
             # Fallback to keyword-based classifier
             self.classifier = None
             self._init_keyword_fallback()

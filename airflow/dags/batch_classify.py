@@ -71,8 +71,9 @@ default_args = {
     'start_date': datetime(2024, 1, 1),
     'email_on_failure': False,
     'email_on_retry': False,
-    'retries': 2,
-    'retry_delay': timedelta(minutes=5),
+    'retries': 1,  # Reduced retries
+    'retry_delay': timedelta(minutes=10),  # Longer retry delay
+    'execution_timeout': timedelta(minutes=30),  # Increased timeout for ML tasks (BERT model downloads)
 }
 
 dag = DAG(
@@ -339,6 +340,7 @@ classify_task = PythonOperator(
     task_id='classify_inquiries',
     python_callable=classify_inquiries,
     dag=dag,
+    execution_timeout=timedelta(minutes=30),  # Specific timeout for ML task (BERT model downloads)
 )
 
 route_task = PythonOperator(
