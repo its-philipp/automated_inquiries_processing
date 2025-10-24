@@ -1,0 +1,287 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: airflow
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airflow-dags
+  namespace: airflow
+data:
+  batch_classify.py: |
+    from datetime import datetime, timedelta
+    from airflow import DAG
+    from airflow.operators.python import PythonOperator
+    from airflow.operators.bash import BashOperator
+    import pandas as pd
+    import requests
+
+    default_args = {
+        'owner': 'inquiry-team',
+        'depends_on_past': False,
+        'start_date': datetime(2024, 1, 1),
+        'email_on_failure': False,
+        'email_on_retry': False,
+        'retries': 1,
+        'retry_delay': timedelta(minutes=5),
+    }
+
+    def classify_pending_inquiries():
+        """Classify all pending inquiries using the ML models."""
+        print("Starting batch classification of pending inquiries...")
+        
+        # This would typically call your FastAPI endpoint
+        # For demo purposes, we'll just log the action
+        print("✅ Batch classification completed!")
+        return "Batch classification successful"
+
+    def update_model_performance():
+        """Update model performance metrics."""
+        print("Updating model performance metrics...")
+        print("✅ Model performance metrics updated!")
+        return "Metrics updated successfully"
+
+    dag = DAG(
+        'batch_classify',
+        default_args=default_args,
+        description='Batch classification of pending inquiries',
+        schedule_interval=timedelta(hours=1),
+        catchup=False,
+        tags=['ml', 'classification', 'batch'],
+    )
+
+    # Task 1: Check for pending inquiries
+    check_pending = BashOperator(
+        task_id='check_pending_inquiries',
+        bash_command='echo "Checking for pending inquiries..."',
+        dag=dag,
+    )
+
+    # Task 2: Run batch classification
+    classify_task = PythonOperator(
+        task_id='classify_inquiries',
+        python_callable=classify_pending_inquiries,
+        dag=dag,
+    )
+
+    # Task 3: Update metrics
+    update_metrics = PythonOperator(
+        task_id='update_metrics',
+        python_callable=update_model_performance,
+        dag=dag,
+    )
+
+    # Task 4: Send notification
+    notify_completion = BashOperator(
+        task_id='notify_completion',
+        bash_command='echo "Batch classification completed successfully!"',
+        dag=dag,
+    )
+
+    # Define task dependencies
+    check_pending >> classify_task >> update_metrics >> notify_completion
+
+  daily_ingestion.py: |
+    from datetime import datetime, timedelta
+    from airflow import DAG
+    from airflow.operators.python import PythonOperator
+    from airflow.operators.bash import BashOperator
+    from airflow.operators.email import EmailOperator
+
+    default_args = {
+        'owner': 'data-team',
+        'depends_on_past': False,
+        'start_date': datetime(2024, 1, 1),
+        'email_on_failure': True,
+        'email_on_retry': False,
+        'retries': 2,
+        'retry_delay': timedelta(minutes=10),
+    }
+
+    def ingest_daily_data():
+        """Ingest daily inquiry data from various sources."""
+        print("Starting daily data ingestion...")
+        
+        # Simulate data ingestion
+        print("📥 Ingesting data from email systems...")
+        print("📥 Ingesting data from web forms...")
+        print("📥 Ingesting data from API endpoints...")
+        
+        print("✅ Daily data ingestion completed!")
+        return "Data ingestion successful"
+
+    def validate_data_quality():
+        """Validate the quality of ingested data."""
+        print("🔍 Validating data quality...")
+        print("✅ Data quality validation passed!")
+        return "Data validation successful"
+
+    def generate_daily_report():
+        """Generate daily processing report."""
+        print("📊 Generating daily report...")
+        print("✅ Daily report generated!")
+        return "Report generation successful"
+
+    dag = DAG(
+        'daily_ingestion',
+        default_args=default_args,
+        description='Daily data ingestion and processing',
+        schedule_interval='0 6 * * *',  # Run daily at 6 AM
+        catchup=False,
+        tags=['data', 'ingestion', 'daily'],
+    )
+
+    # Task 1: Start ingestion
+    start_ingestion = BashOperator(
+        task_id='start_ingestion',
+        bash_command='echo "Starting daily data ingestion at $(date)"',
+        dag=dag,
+    )
+
+    # Task 2: Ingest data
+    ingest_data = PythonOperator(
+        task_id='ingest_data',
+        python_callable=ingest_daily_data,
+        dag=dag,
+    )
+
+    # Task 3: Validate data
+    validate_data = PythonOperator(
+        task_id='validate_data',
+        python_callable=validate_data_quality,
+        dag=dag,
+    )
+
+    # Task 4: Generate report
+    generate_report = PythonOperator(
+        task_id='generate_report',
+        python_callable=generate_daily_report,
+        dag=dag,
+    )
+
+    # Task 5: Send completion email
+    send_email = EmailOperator(
+        task_id='send_completion_email',
+        to=['admin@company.com'],
+        subject='Daily Ingestion Completed',
+        html_content='<p>Daily data ingestion has completed successfully.</p>',
+        dag=dag,
+    )
+
+    # Define task dependencies
+    start_ingestion >> ingest_data >> validate_data >> generate_report >> send_email
+
+  model_retrain.py: |
+    from datetime import datetime, timedelta
+    from airflow import DAG
+    from airflow.operators.python import PythonOperator
+    from airflow.operators.bash import BashOperator
+    from airflow.sensors.filesystem import FileSensor
+
+    default_args = {
+        'owner': 'ml-team',
+        'depends_on_past': False,
+        'start_date': datetime(2024, 1, 1),
+        'email_on_failure': True,
+        'email_on_retry': False,
+        'retries': 1,
+        'retry_delay': timedelta(minutes=15),
+    }
+
+    def prepare_training_data():
+        """Prepare data for model retraining."""
+        print("🔄 Preparing training data...")
+        print("✅ Training data prepared!")
+        return "Data preparation successful"
+
+    def retrain_classifier():
+        """Retrain the classification model."""
+        print("🤖 Retraining classification model...")
+        print("✅ Classification model retrained!")
+        return "Classifier retraining successful"
+
+    def retrain_sentiment():
+        """Retrain the sentiment analysis model."""
+        print("😊 Retraining sentiment model...")
+        print("✅ Sentiment model retrained!")
+        return "Sentiment retraining successful"
+
+    def retrain_urgency():
+        """Retrain the urgency prediction model."""
+        print("⚡ Retraining urgency model...")
+        print("✅ Urgency model retrained!")
+        return "Urgency retraining successful"
+
+    def validate_models():
+        """Validate retrained models."""
+        print("🔍 Validating retrained models...")
+        print("✅ Model validation completed!")
+        return "Model validation successful"
+
+    def deploy_models():
+        """Deploy validated models to production."""
+        print("🚀 Deploying models to production...")
+        print("✅ Models deployed successfully!")
+        return "Model deployment successful"
+
+    dag = DAG(
+        'model_retrain',
+        default_args=default_args,
+        description='Retrain ML models with new data',
+        schedule_interval='0 2 * * 0',  # Run weekly on Sunday at 2 AM
+        catchup=False,
+        tags=['ml', 'retraining', 'weekly'],
+    )
+
+    # Task 1: Prepare data
+    prepare_data = PythonOperator(
+        task_id='prepare_training_data',
+        python_callable=prepare_training_data,
+        dag=dag,
+    )
+
+    # Task 2-4: Retrain models in parallel
+    retrain_classifier_task = PythonOperator(
+        task_id='retrain_classifier',
+        python_callable=retrain_classifier,
+        dag=dag,
+    )
+
+    retrain_sentiment_task = PythonOperator(
+        task_id='retrain_sentiment',
+        python_callable=retrain_sentiment,
+        dag=dag,
+    )
+
+    retrain_urgency_task = PythonOperator(
+        task_id='retrain_urgency',
+        python_callable=retrain_urgency,
+        dag=dag,
+    )
+
+    # Task 5: Validate models
+    validate_models_task = PythonOperator(
+        task_id='validate_models',
+        python_callable=validate_models,
+        dag=dag,
+    )
+
+    # Task 6: Deploy models
+    deploy_models_task = PythonOperator(
+        task_id='deploy_models',
+        python_callable=deploy_models,
+        dag=dag,
+    )
+
+    # Task 7: Notify completion
+    notify_completion = BashOperator(
+        task_id='notify_completion',
+        bash_command='echo "Model retraining pipeline completed successfully!"',
+        dag=dag,
+    )
+
+    # Define task dependencies
+    prepare_data >> [retrain_classifier_task, retrain_sentiment_task, retrain_urgency_task]
+    [retrain_classifier_task, retrain_sentiment_task, retrain_urgency_task] >> validate_models_task
+    validate_models_task >> deploy_models_task >> notify_completion

@@ -1,0 +1,29 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: init-database
+  namespace: inquiries-system
+spec:
+  template:
+    spec:
+      containers:
+      - name: init-database
+        image: python:3.11-slim
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            pip install sqlalchemy psycopg2-binary
+            cd /app
+            python init-database-simple.py
+        env:
+        - name: DATABASE_URL
+          value: "postgresql://postgres:postgres@postgresql.inquiries-system.svc.cluster.local:5432/inquiry_automation"
+        volumeMounts:
+        - name: app-code
+          mountPath: /app
+      volumes:
+      - name: app-code
+        configMap:
+          name: streamlit-app-code
+      restartPolicy: Never
+  backoffLimit: 3

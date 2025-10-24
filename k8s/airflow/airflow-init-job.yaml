@@ -1,0 +1,21 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: airflow-init
+  namespace: airflow
+spec:
+  template:
+    spec:
+      containers:
+      - name: init
+        image: apache/airflow:2.7.3-python3.11
+        env:
+        - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+          value: "postgresql://postgres:postgres@postgresql.inquiries-system.svc.cluster.local:5432/airflow"
+        - name: AIRFLOW__CORE__FERNET_KEY
+          value: "sVy65SeclhVH4L71cdB4tJfI7aZptw-N6hXyEpobOnY="
+        - name: AIRFLOW__WEBSERVER__SECRET_KEY
+          value: "airflow-secret-key-2024"
+        command: ["airflow", "db", "init"]
+      restartPolicy: Never
+  backoffLimit: 3

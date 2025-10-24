@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: streamlit-dashboard
+  labels:
+    app: streamlit-dashboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: streamlit-dashboard
+  template:
+    metadata:
+      labels:
+        app: streamlit-dashboard
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      containers:
+      - name: streamlit-dashboard
+        image: python:3.11-slim
+        ports:
+        - containerPort: 8501
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            pip install streamlit pandas plotly sqlalchemy psycopg2-binary
+            cd /app
+            streamlit run inquiry_monitoring_dashboard.py --server.port=8501 --server.address=0.0.0.0
+        env:
+        - name: DATABASE_URL
+          value: "postgresql://postgres:postgres@postgresql.inquiries-system.svc.cluster.local:5432/inquiry_automation"
+        - name: STREAMLIT_SERVER_PORT
+          value: "8501"
+        - name: STREAMLIT_SERVER_ADDRESS
+          value: "0.0.0.0"
+        volumeMounts:
+        - name: app-code
+          mountPath: /app
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+      volumes:
+      - name: app-code
+        configMap:
+          name: streamlit-app-code
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: streamlit-dashboard
+  labels:
+    app: streamlit-dashboard
+spec:
+  selector:
+    app: streamlit-dashboard
+  ports:
+    - protocol: TCP
+      port: 8501
+      targetPort: 8501
+  type: NodePort

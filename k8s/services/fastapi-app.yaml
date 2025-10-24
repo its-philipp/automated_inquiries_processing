@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fastapi-app
+  labels:
+    app: fastapi-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fastapi-app
+  template:
+    metadata:
+      labels:
+        app: fastapi-app
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      containers:
+      - name: fastapi-app
+        image: python:3.11-slim
+        ports:
+        - containerPort: 8000
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            pip install fastapi uvicorn sqlalchemy psycopg2-binary redis prometheus-client
+            cd /app
+            export PYTHONPATH=/app:/app/src
+            uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+        env:
+        - name: DATABASE_URL
+          value: "postgresql://postgres:postgres@postgresql.inquiries-system.svc.cluster.local:5432/inquiry_automation"
+        - name: REDIS_URL
+          value: "redis://redis-master.inquiries-system.svc.cluster.local:6379"
+        volumeMounts:
+        - name: app-code
+          mountPath: /app
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+      volumes:
+      - name: app-code
+        configMap:
+          name: streamlit-app-code
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fastapi-app
+  labels:
+    app: fastapi-app
+spec:
+  selector:
+    app: fastapi-app
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
+  type: NodePort
