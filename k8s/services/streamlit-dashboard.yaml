@@ -5,8 +5,10 @@ metadata:
   namespace: inquiries-system
   labels:
     app: streamlit-dashboard
+    version: v2.0-gitops  # GitOps demo version
+    managed-by: argocd
 spec:
-  replicas: 1
+  replicas: 2  # Scale to 2 for high availability!
   selector:
     matchLabels:
       app: streamlit-dashboard
