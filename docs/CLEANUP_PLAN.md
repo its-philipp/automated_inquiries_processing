@@ -3,9 +3,9 @@
 ## Files to KEEP (Production-Ready)
 
 ### **Root Scripts (macOS Primary, Linux Backup)**
-- ✅ `start-bulletproof-macos.sh` - PRIMARY macOS startup
-- ✅ `start-bulletproof.sh` - BACKUP for Linux
-- ✅ `stop-cncf.sh` - Stop services
+- ✅ `start-macos.sh` - PRIMARY macOS startup
+- ✅ `start-linux.sh` - BACKUP for Linux
+- ✅ `stop.sh` - Stop services
 - ✅ `keep-port-forwards-alive.sh` - Port-forward manager
 
 ### **Documentation (Keep All)**
@@ -41,7 +41,7 @@
 - ❌ `access-services.sh` - Not needed (ports in documentation)
 - ❌ `setup-all.sh` - Old setup script
 - ❌ `start-services.sh` - Replaced by start-bulletproof
-- ❌ `stop-services.sh` - Use stop-cncf.sh
+- ❌ `stop-services.sh` - Use stop.sh
 - ❌ `test-services.sh` - Functionality in main scripts
 
 ### **Old Deployment Scripts**
@@ -92,9 +92,9 @@ automated_inquiries_processing/
 ├── PROJECT_SUMMARY.md
 │
 ├── scripts/                          # All executable scripts
-│   ├── start-bulletproof-macos.sh    # PRIMARY - macOS
-│   ├── start-bulletproof.sh          # BACKUP - Linux
-│   ├── stop-cncf.sh
+│   ├── start-macos.sh    # PRIMARY - macOS
+│   ├── start-linux.sh          # BACKUP - Linux
+│   ├── stop.sh
 │   └── keep-port-forwards-alive.sh
 │
 ├── docker/

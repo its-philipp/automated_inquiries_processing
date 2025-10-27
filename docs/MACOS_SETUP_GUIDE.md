@@ -9,7 +9,7 @@
 4. ❌ OOMKilled errors due to BERT models
 
 ### Solutions Implemented:
-1. ✅ Created `start-bulletproof-macos.sh` for macOS
+1. ✅ Created `start-macos.sh` for macOS
 2. ✅ Built custom Airflow image with BERT models (`airflow-ml:2.7.3`)
 3. ✅ Increased memory limits to 2GB (was 1GB)
 4. ✅ Fixed DAG symlink issues with init containers
@@ -27,7 +27,7 @@
 ### One-Command Deployment
 ```bash
 cd /Users/philipptrinh/workspace/playground/automated_inquiries_processing
-./start-bulletproof-macos.sh
+./start-macos.sh
 ```
 
 This will:
@@ -183,7 +183,7 @@ helm uninstall argocd -n argocd
 ## 🛑 Stop Everything
 
 ```bash
-./stop-cncf.sh
+./stop.sh
 ```
 
 Or manually:
@@ -257,7 +257,7 @@ Services and their memory footprint:
 
 ## 📝 Files Created for macOS
 
-1. **start-bulletproof-macos.sh** - Main startup script
+1. **start-macos.sh** - Main startup script
 2. **docker/airflow-ml.Dockerfile** - Custom Airflow with BERT
 3. **k8s/airflow/airflow-with-dags-fix.yaml** - Optimized Airflow deployment
 4. **keep-port-forwards-alive.sh** - Port-forward monitoring
@@ -346,7 +346,7 @@ If something goes wrong:
 2. **View logs**: `kubectl logs -n <namespace> <pod-name>`
 3. **Check resources**: `docker stats`
 4. **View events**: `kubectl get events --all-namespaces --sort-by='.lastTimestamp' | tail -20`
-5. **Restart everything**: `kind delete cluster --name cncf-cluster && ./start-bulletproof-macos.sh`
+5. **Restart everything**: `kind delete cluster --name cncf-cluster && ./start-macos.sh`
 
 ---
 

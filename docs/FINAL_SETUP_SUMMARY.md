@@ -29,7 +29,7 @@
 - ✅ Converted Linux scripts to macOS (Homebrew instead of apt)
 - ✅ Docker Desktop integration with resource checks
 - ✅ Kind cluster running smoothly on macOS
-- ✅ Custom startup script: `start-bulletproof-macos.sh`
+- ✅ Custom startup script: `start-macos.sh`
 
 ### **2. Airflow with ML/NLP** ✅
 - ✅ Custom Docker image with BERT models pre-installed
@@ -107,7 +107,7 @@ Success Rate: 100%
 ### **Start Everything**
 ```bash
 cd /Users/philipptrinh/workspace/playground/automated_inquiries_processing
-./start-bulletproof-macos.sh
+./start-macos.sh
 ```
 
 ### **Access Services**
@@ -198,7 +198,7 @@ git push
 4. **FINAL_SETUP_SUMMARY.md** - This file!
 
 ### **Key Files**
-- `start-bulletproof-macos.sh` - Main startup script
+- `start-macos.sh` - Main startup script
 - `keep-port-forwards-alive.sh` - Port-forward management
 - `docker/airflow-ml.Dockerfile` - Custom Airflow with BERT
 - `k8s/airflow/airflow-with-dags-fix.yaml` - Optimized Airflow deployment
@@ -357,8 +357,8 @@ kubectl logs -n airflow deployment/airflow-scheduler --tail=100
 
 ### **Reset everything**
 ```bash
-./stop-cncf.sh
-./start-bulletproof-macos.sh
+./stop.sh
+./start-macos.sh
 ```
 
 ---

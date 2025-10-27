@@ -11,9 +11,9 @@ This is the **production-ready** directory structure after cleanup. All obsolete
 ```
 automated_inquiries_processing/
 ├── *.md                               # 📚 Documentation (7 guides)
-├── start-bulletproof-macos.sh         # 🚀 PRIMARY - macOS startup script
-├── start-bulletproof.sh               # 🔄 BACKUP - Linux startup script  
-├── stop-cncf.sh                       # 🛑 Stop all services
+├── start-macos.sh         # 🚀 PRIMARY - macOS startup script
+├── start-linux.sh               # 🔄 BACKUP - Linux startup script  
+├── stop.sh                       # 🛑 Stop all services
 ├── keep-port-forwards-alive.sh        # 🔌 Port-forward manager
 └── inquiry_monitoring_dashboard.py    # 📊 Streamlit dashboard
 ```
@@ -40,7 +40,7 @@ docker/
 **Purpose:** 
 - Builds Airflow image with ML/NLP libraries
 - Pre-downloads BART and RoBERTa models
-- Used by: `start-bulletproof-macos.sh`
+- Used by: `start-macos.sh`
 
 ---
 
@@ -175,7 +175,7 @@ tests/
 - ❌ `access-services.sh` - Functionality documented
 - ❌ `setup-all.sh` - Replaced by start-bulletproof
 - ❌ `start-services.sh` - Old version
-- ❌ `stop-services.sh` - Replaced by stop-cncf.sh
+- ❌ `stop-services.sh` - Replaced by stop.sh
 - ❌ `test-services.sh` - Not needed
 - ❌ `scripts/setup.sh` - Old setup
 - ❌ `scripts/test_api.sh` - Old tests
@@ -233,14 +233,14 @@ tests/
 
 ### Start Everything
 ```bash
-./start-bulletproof-macos.sh
+./start-macos.sh
 # For Linux:
-./start-bulletproof.sh
+./start-linux.sh
 ```
 
 ### Stop Everything
 ```bash
-./stop-cncf.sh
+./stop.sh
 ```
 
 ### Keep Port-Forwards Alive
@@ -254,8 +254,8 @@ tests/
 
 | File | Purpose | Status |
 |------|---------|--------|
-| `start-bulletproof-macos.sh` | Main startup (macOS) | ✅ Active |
-| `start-bulletproof.sh` | Backup (Linux) | ✅ Active |
+| `start-macos.sh` | Main startup (macOS) | ✅ Active |
+| `start-linux.sh` | Backup (Linux) | ✅ Active |
 | `docker/airflow-ml.Dockerfile` | Custom Airflow image | ✅ Active |
 | `k8s/airflow/airflow-with-dags-fix.yaml` | Airflow deployment | ✅ Active |
 | `k8s/argocd/streamlit-gitops.yaml` | GitOps sync | ✅ Active, Synced |
