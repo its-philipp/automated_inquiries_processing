@@ -32,10 +32,16 @@ A **production-grade** MLOps pipeline for automated inquiry processing with Kube
 
 **The script auto-installs**: Kind, kubectl, Helm, Istio
 
-### One-Command Deployment (macOS)
+### One-Command Deployment
 
+**macOS:**
 ```bash
-./start-bulletproof-macos.sh
+./start-macos.sh
+```
+
+**Linux:**
+```bash
+./start-linux.sh
 ```
 
 **This deploys everything:**
@@ -47,11 +53,6 @@ A **production-grade** MLOps pipeline for automated inquiry processing with Kube
 - ✅ PostgreSQL + Redis
 - ✅ Streamlit dashboard + FastAPI backend
 - ✅ All port-forwards configured
-
-**For Linux:**
-```bash
-./start-bulletproof.sh
-```
 
 ---
 
@@ -97,9 +98,9 @@ Once deployed, access services at:
 ```
 automated_inquiries_processing/
 ├── README.md                          # This file
-├── start-bulletproof-macos.sh         # 🚀 PRIMARY macOS startup
-├── start-bulletproof.sh               # 🔄 Linux startup  
-├── stop-cncf.sh                       # Stop all services
+├── start-macos.sh                     # 🚀 macOS startup
+├── start-linux.sh                     # 🔄 Linux startup  
+├── stop.sh                            # Stop everything
 ├── keep-port-forwards-alive.sh        # Port-forward manager
 │
 ├── docs/                              # 📚 Complete documentation (8 guides)
@@ -235,7 +236,7 @@ See [docs/SECURITY.md](docs/SECURITY.md) for:
 
 ### Stop Everything
 ```bash
-./stop-cncf.sh
+./stop.sh
 ```
 
 ### Restart Port-Forwards (if they die)
@@ -380,7 +381,7 @@ MIT License - See LICENSE file for details
 
 **Try it out:**
 ```bash
-./start-bulletproof-macos.sh
+./start-macos.sh  # or ./start-linux.sh on Linux
 ```
 
 **Explore features:**
