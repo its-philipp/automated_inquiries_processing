@@ -172,7 +172,7 @@ def store_inquiries(**context):
     # Direct database connection
     try:
         conn = psycopg2.connect(
-            host='postgres',
+            host='postgresql.inquiries-system.svc.cluster.local',
             port=5432,
             database='inquiry_automation',
             user='postgres',

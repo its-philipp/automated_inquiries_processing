@@ -1,0 +1,36 @@
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: inquiries-gateway
+  namespace: istio-system
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*"  # Accept all hosts including localhost
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: streamlit-dashboard-route
+  namespace: inquiries-system
+spec:
+  hosts:
+  - "*"  # Accept all hosts
+  gateways:
+  - istio-system/inquiries-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: streamlit-dashboard
+        port:
+          number: 8501
+

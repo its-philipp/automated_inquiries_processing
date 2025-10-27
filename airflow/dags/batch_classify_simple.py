@@ -38,17 +38,11 @@ def load_unprocessed_inquiries(**context):
     )
     cursor = conn.cursor()
     
-    # For rule-based: no limit needed (can handle thousands)
-    # For BERT: limit to 50 to avoid OOM
-    import os
-    use_rule_based = os.getenv('USE_RULE_BASED_CLASSIFICATION', 'false').lower() == 'true'
-    limit_clause = "" if use_rule_based else "LIMIT 50"
-    
-    query = f"""
+    query = """
         SELECT id, subject, body, sender_email, sender_name, timestamp
         FROM inquiries
         WHERE processed = FALSE
-        {limit_clause}
+        LIMIT 1000
     """
     
     cursor.execute(query)
@@ -84,25 +78,17 @@ def classify_inquiries(**context):
         print("No inquiries to classify")
         return 0
     
-    # Check if we should use BERT based on environment
-    import os
-    force_rule_based = os.getenv('USE_RULE_BASED_CLASSIFICATION', 'false').lower() == 'true'
-    
-    # Try to use BERT models (only if not forced to use rule-based)
+    # Try to use BERT models
     use_bert = False
-    if not force_rule_based:
-        try:
-            print("⏳ Attempting to load BERT models...")
-            from transformers import pipeline
-            classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
-            sentiment_analyzer = pipeline("sentiment-analysis", model="cardiffnlp/twitter-roberta-base-sentiment-latest")
-            use_bert = True
-            print("✅ Using BERT models for classification")
-        except Exception as e:
-            print(f"⚠️  BERT models not available ({e}), falling back to rule-based classification")
-            use_bert = False
-    else:
-        print("⚠️  System memory <16GB - Using fast rule-based classification instead of BERT")
+    try:
+        from transformers import pipeline
+        classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+        sentiment_analyzer = pipeline("sentiment-analysis", model="cardiffnlp/twitter-roberta-base-sentiment-latest")
+        use_bert = True
+        print("✅ Using BERT models for classification")
+    except Exception as e:
+        print(f"⚠️  BERT models not available ({e}), falling back to rule-based classification")
+        use_bert = False
     
     predictions = []
     
