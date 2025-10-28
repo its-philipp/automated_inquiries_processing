@@ -362,153 +362,13 @@ else
     exit 1
 fi
 
-# Deploy Airflow WITHOUT DAGs first (to avoid ConfigMap recursive loop during init)
+# Create ConfigMaps BEFORE deploying pods (to avoid mount failures)
+echo "  📋 Creating ConfigMaps..."
+kubectl create configmap airflow-dags --from-file=airflow/dags/ -n airflow --dry-run=client -o yaml | kubectl apply -f - 2>/dev/null || true
+
+# Deploy Airflow using the same optimized YAML file as macOS
 echo "  🚀 Deploying Airflow (without DAGs for initialization)..."
-kubectl apply -f - <<EOF
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: airflow-webserver
-  namespace: airflow
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: airflow-webserver
-  template:
-    metadata:
-      labels:
-        app: airflow-webserver
-    spec:
-      initContainers:
-      - name: copy-dags
-        image: busybox
-        command: ['sh', '-c', 'cp -rL /dags-source/* /dags-dest/ && ls -la /dags-dest/']
-        volumeMounts:
-        - name: dags-source
-          mountPath: /dags-source
-        - name: dags
-          mountPath: /dags-dest
-      containers:
-      - name: webserver
-        image: airflow-ml:2.7.3
-        ports:
-        - containerPort: 8080
-        command: ["airflow", "webserver", "--port", "8080", "--host", "0.0.0.0"]
-        env:
-        - name: AIRFLOW__CORE__EXECUTOR
-          value: LocalExecutor
-        - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
-          value: "postgresql://postgres:postgres@postgresql.inquiries-system.svc.cluster.local:5432/airflow"
-        - name: AIRFLOW__CORE__DAGS_FOLDER
-          value: "/opt/airflow/dags"  # Use DAGs folder with proper mount
-        - name: AIRFLOW__CORE__LOAD_EXAMPLES
-          value: "False"
-        - name: AIRFLOW__CORE__LOAD_DEFAULT_CONNECTIONS
-          value: "False"
-        - name: AIRFLOW__CLI__ENABLE_LAZY_LOADING
-          value: "True"
-        - name: AIRFLOW__WEBSERVER__SECRET_KEY
-          value: "airflow-secret-key-2024"
-        - name: AIRFLOW__CORE__FERNET_KEY
-          value: "sVy65SeclhVH4L71cdB4tJfI7aZptw-N6hXyEpobOnY="
-        - name: AIRFLOW__WEBSERVER__EXPOSE_CONFIG
-          value: "True"
-        volumeMounts:
-        - name: dags
-          mountPath: /opt/airflow/dags
-          readOnly: true
-        resources:
-          requests:
-            memory: "512Mi"
-            cpu: "200m"
-          limits:
-            memory: "1Gi"
-            cpu: "400m"
-      volumes:
-      - name: dags-source
-        configMap:
-          name: airflow-dags
-      - name: dags
-        emptyDir: {}
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: airflow-webserver
-  namespace: airflow
-spec:
-  selector:
-    app: airflow-webserver
-  ports:
-    - port: 8080
-      targetPort: 8080
-      nodePort: 30007
-  type: NodePort
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: airflow-scheduler
-  namespace: airflow
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: airflow-scheduler
-  template:
-    metadata:
-      labels:
-        app: airflow-scheduler
-    spec:
-      initContainers:
-      - name: copy-dags
-        image: busybox
-        command: ['sh', '-c', 'cp -rL /dags-source/* /dags-dest/ && ls -la /dags-dest/']
-        volumeMounts:
-        - name: dags-source
-          mountPath: /dags-source
-        - name: dags
-          mountPath: /dags-dest
-      containers:
-      - name: scheduler
-        image: airflow-ml:2.7.3
-        command: ["airflow", "scheduler"]
-        env:
-        - name: AIRFLOW__CORE__EXECUTOR
-          value: LocalExecutor
-        - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
-          value: "postgresql://postgres:postgres@postgresql.inquiries-system.svc.cluster.local:5432/airflow"
-        - name: AIRFLOW__CORE__DAGS_FOLDER
-          value: "/opt/airflow/dags"  # Use DAGs folder from the start
-        - name: AIRFLOW__CORE__LOAD_EXAMPLES
-          value: "False"
-        - name: AIRFLOW__CORE__LOAD_DEFAULT_CONNECTIONS
-          value: "False"
-        - name: AIRFLOW__CLI__ENABLE_LAZY_LOADING
-          value: "True"
-        - name: AIRFLOW__WEBSERVER__SECRET_KEY
-          value: "airflow-secret-key-2024"
-        - name: AIRFLOW__CORE__FERNET_KEY
-          value: "sVy65SeclhVH4L71cdB4tJfI7aZptw-N6hXyEpobOnY="
-        volumeMounts:
-        - name: dags
-          mountPath: /opt/airflow/dags
-          readOnly: true
-        resources:
-          requests:
-            memory: "512Mi"
-            cpu: "200m"
-          limits:
-            memory: "1Gi"
-            cpu: "400m"
-      volumes:
-      - name: dags-source
-        configMap:
-          name: airflow-dags
-      - name: dags
-        emptyDir: {}
-EOF
+kubectl apply -f k8s/airflow/airflow-with-dags-fix.yaml
 
 # Wait for Airflow webserver to be ready
 echo "  ⏳ Waiting for Airflow webserver to be ready..."
@@ -574,10 +434,9 @@ if [ -n "$AIRFLOW_POD" ]; then
     fi
 fi
 
-# Create ConfigMaps (DAGs are already configured in the deployment spec above)
-echo "  📋 Creating ConfigMaps..."
+# Create remaining ConfigMaps (airflow-dags already created earlier)
+echo "  📋 Creating remaining ConfigMaps..."
 kubectl create configmap streamlit-app-code --from-file=inquiry_monitoring_dashboard.py --from-file=src/ --from-file=k8s/database/init-database-simple.py -n inquiries-system --dry-run=client -o yaml | kubectl apply -f - 2>/dev/null || true
-kubectl create configmap airflow-dags --from-file=airflow/dags/ -n airflow --dry-run=client -o yaml | kubectl apply -f - 2>/dev/null || true
 echo -e "${GREEN}✅ ConfigMaps created${NC}"
 echo "  ✅ Airflow ready with DAGs"
 
@@ -637,12 +496,19 @@ kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-server --no-headers 
 # Display final status
 echo -e "\n${GREEN}🎉 Complete CNCF Stack Ready!${NC}"
 echo "========================"
+
+# Get ArgoCD password
+ARGOCD_PASSWORD=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" 2>/dev/null | base64 -d 2>/dev/null)
+if [ -z "$ARGOCD_PASSWORD" ]; then
+    ARGOCD_PASSWORD="<get-password>"
+fi
+
 echo -e "\n${YELLOW}📊 Access Your Complete CNCF Stack:${NC}"
 echo "  • Streamlit Dashboard: http://localhost:8501"
 echo "  • FastAPI Backend:     http://localhost:8000 (Swagger: /docs)"
 echo "  • Grafana Monitoring:  http://localhost:3000 (admin/admin)"
 echo "  • Airflow DAGs:        http://localhost:8080 (admin/admin)"
-echo "  • ArgoCD GitOps:       https://localhost:30009 (admin/<get-password>)"
+echo "  • ArgoCD GitOps:       https://localhost:30009 (admin/$ARGOCD_PASSWORD)"
 echo "  • Istio Gateway:       http://localhost:30080"
 echo ""
 echo -e "${YELLOW}🔄 Available DAGs in Airflow:${NC}"
