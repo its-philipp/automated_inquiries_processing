@@ -362,12 +362,29 @@ else
     exit 1
 fi
 
-# Create ConfigMaps BEFORE deploying pods (to avoid mount failures)
+# Create DNS alias for PostgreSQL in airflow namespace (for DAG compatibility)
+echo "  🔗 Creating PostgreSQL DNS alias in airflow namespace..."
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: airflow
+spec:
+  type: ExternalName
+  externalName: postgresql.inquiries-system.svc.cluster.local
+EOF
+echo "  ✅ PostgreSQL DNS alias created"
+
+# Deploy Airflow with optimized configuration (includes BERT models and proper memory limits)
+echo "  🚀 Deploying Airflow with BERT-enabled image and DAGs..."
+
+# Create ConfigMaps first
 echo "  📋 Creating ConfigMaps..."
 kubectl create configmap airflow-dags --from-file=airflow/dags/ -n airflow --dry-run=client -o yaml | kubectl apply -f - 2>/dev/null || true
+echo "  ✅ ConfigMaps created"
 
-# Deploy Airflow using the same optimized YAML file as macOS
-echo "  🚀 Deploying Airflow..."
+# Deploy Airflow using optimized YAML with custom image and increased memory
 kubectl apply -f k8s/airflow/airflow-with-dags-fix.yaml
 
 # Wait for Airflow to be ready
@@ -430,13 +447,27 @@ if [ -n "$AIRFLOW_POD" ]; then
             fi
         fi
     fi
+    
+    # Verify user was created
+    if kubectl exec -n airflow $AIRFLOW_POD -- airflow users list 2>/dev/null | grep -q "admin"; then
+        echo "  ✅ Admin user verified in database"
+    else
+        echo "  ❌ Admin user creation failed!"
+    fi
 fi
 
-# Create remaining ConfigMaps (airflow-dags already created earlier)
+# Unpause all DAGs
+echo "  ▶️  Unpausing DAGs..."
+kubectl exec -n airflow $AIRFLOW_POD -- airflow dags unpause batch_classify_inquiries 2>/dev/null || true
+kubectl exec -n airflow $AIRFLOW_POD -- airflow dags unpause daily_data_ingestion 2>/dev/null || true
+kubectl exec -n airflow $AIRFLOW_POD -- airflow dags unpause model_retraining 2>/dev/null || true
+
+echo "  ✅ Airflow ready with all 3 DAGs"
+
+# Create remaining ConfigMaps
 echo "  📋 Creating remaining ConfigMaps..."
 kubectl create configmap streamlit-app-code --from-file=inquiry_monitoring_dashboard.py --from-file=src/ --from-file=k8s/database/init-database-simple.py -n inquiries-system --dry-run=client -o yaml | kubectl apply -f - 2>/dev/null || true
 echo -e "${GREEN}✅ ConfigMaps created${NC}"
-echo "  ✅ Airflow ready with DAGs"
 
 # Initialize application database
 echo -e "${BLUE}🗄️  Initializing application database...${NC}"
