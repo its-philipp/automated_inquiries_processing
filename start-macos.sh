@@ -578,33 +578,45 @@ echo -e "${BLUE}💡 Full CNCF stack with robust error handling and proper Airfl
 # Start port-forwards ONLY after all services are confirmed ready
 echo -e "\n${BLUE}🌐 Starting port-forwards...${NC}"
 pkill -f "kubectl port-forward" 2>/dev/null || true
+sleep 5  # Give enough time for cleanup
+
+echo "  🔌 Setting up port forwarding with proper wait times..."
+
+# Wait for pods to be fully ready before port-forwarding
+echo "  ⏳ Ensuring all pods are fully ready..."
+kubectl wait --for=condition=ready pod -l app=streamlit-dashboard -n inquiries-system --timeout=30s 2>/dev/null || echo "  ⚠️  Streamlit pod not ready yet"
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=grafana -n monitoring --timeout=30s 2>/dev/null || echo "  ⚠️  Grafana pod not ready yet"
+kubectl wait --for=condition=ready pod -l app=airflow-webserver -n airflow --timeout=30s 2>/dev/null || echo "  ⚠️  Airflow pod not ready yet"
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=argocd-server -n argocd --timeout=30s 2>/dev/null || echo "  ⚠️  ArgoCD pod not ready yet"
+
+sleep 5  # Extra time for services to stabilize
+
+# Start each port forward with better spacing and logging
+echo "  🔌 Starting Streamlit port-forward..."
+nohup kubectl port-forward -n inquiries-system svc/streamlit-dashboard 8501:8501 > /tmp/pf-streamlit.log 2>&1 &
 sleep 3
 
-echo "  🔌 Setting up robust port forwarding with logging..."
-# Start each port forward with nohup and individual log files for debugging
-nohup kubectl port-forward -n inquiries-system svc/streamlit-dashboard 8501:8501 > /tmp/pf-streamlit.log 2>&1 &
-sleep 2
+echo "  🔌 Starting Grafana port-forward..."
 nohup kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80 > /tmp/pf-grafana.log 2>&1 &
-sleep 2
-nohup kubectl port-forward -n airflow svc/airflow-webserver 8080:8080 > /tmp/pf-airflow.log 2>&1 &
-sleep 2
-nohup kubectl port-forward -n argocd svc/argocd-server 30009:443 > /tmp/pf-argocd.log 2>&1 &
 sleep 3
+
+echo "  🔌 Starting Airflow port-forward..."
+nohup kubectl port-forward -n airflow svc/airflow-webserver 8080:8080 > /tmp/pf-airflow.log 2>&1 &
+sleep 3
+
+echo "  🔌 Starting ArgoCD port-forward..."
+nohup kubectl port-forward -n argocd svc/argocd-server 30009:443 > /tmp/pf-argocd.log 2>&1 &
+sleep 5  # Extra time for all to stabilize
 
 # Verify port forwards are running
 echo "  🔍 Verifying port forwards..."
 PORT_FORWARDS=$(ps aux | grep "kubectl port-forward" | grep -v grep | wc -l)
 if [ "$PORT_FORWARDS" -ge 4 ]; then
-    echo "  ✅ All port forwards active ($PORT_FORWARDS processes)"
+    echo "  ✅ All $PORT_FORWARDS port forwards active"
 else
-    echo "  ⚠️  Only $PORT_FORWARDS port forwards active, restarting..."
-    pkill -f "kubectl port-forward" 2>/dev/null || true
-    sleep 2
-    nohup kubectl port-forward -n inquiries-system svc/streamlit-dashboard 8501:8501 > /tmp/pf-streamlit.log 2>&1 &
-    nohup kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80 > /tmp/pf-grafana.log 2>&1 &
-    nohup kubectl port-forward -n airflow svc/airflow-webserver 8080:8080 > /tmp/pf-airflow.log 2>&1 &
-    nohup kubectl port-forward -n argocd svc/argocd-server 30009:443 > /tmp/pf-argocd.log 2>&1 &
-    sleep 3
+    echo "  ⚠️  Only $PORT_FORWARDS/4 port forwards active"
+    echo "  💡 Some port-forwards may need manual restart"
+    echo "  💡 Run: ./keep-port-forwards-alive.sh in another terminal"
 fi
 
 # Verify services are accessible
