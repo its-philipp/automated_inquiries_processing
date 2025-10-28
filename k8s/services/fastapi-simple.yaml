@@ -18,21 +18,15 @@ spec:
     spec:
       containers:
       - name: fastapi-simple
-        image: python:3.11-slim
+        image: fastapi-app:1.0.0
+        imagePullPolicy: Never
         ports:
         - containerPort: 8000
-        command: ["/bin/bash", "-c"]
-        args:
-          - |
-            pip install fastapi uvicorn sqlalchemy psycopg2-binary redis prometheus-client pydantic scikit-learn transformers torch
-            cd /app
-            uvicorn src.api.main:app --host 0.0.0.0 --port 8000
         env:
         - name: DATABASE_URL
           value: "postgresql://postgres:postgres@postgresql.inquiries-system.svc.cluster.local:5432/inquiry_automation"
-        volumeMounts:
-        - name: app-code
-          mountPath: /app
+        - name: REDIS_URL
+          value: "redis://redis.inquiries-system.svc.cluster.local:6379"
         resources:
           requests:
             memory: "512Mi"
@@ -40,10 +34,6 @@ spec:
           limits:
             memory: "1Gi"
             cpu: "500m"
-      volumes:
-      - name: app-code
-        configMap:
-          name: streamlit-app-code
 ---
 apiVersion: v1
 kind: Service

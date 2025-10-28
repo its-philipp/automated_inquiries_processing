@@ -175,10 +175,21 @@ else
     echo "  ✅ Custom Airflow image already exists"
 fi
 
-# Load custom image into Kind cluster
-echo "  📤 Loading custom image into Kind cluster..."
+# Build custom FastAPI image with ML dependencies
+echo -e "${BLUE}🔧 Building custom FastAPI image with ML/NLP libraries...${NC}"
+if ! docker images | grep -q "fastapi-app.*1.0.0"; then
+    echo "  📦 Building fastapi-app:1.0.0 (this may take 3-5 minutes)..."
+    docker build -t fastapi-app:1.0.0 -f docker/fastapi-app.Dockerfile . 
+    echo "  ✅ Custom FastAPI image built"
+else
+    echo "  ✅ Custom FastAPI image already exists"
+fi
+
+# Load custom images into Kind cluster
+echo "  📤 Loading custom images into Kind cluster..."
 kind load docker-image airflow-ml:2.7.3 --name cncf-cluster
-echo -e "${GREEN}✅ Custom Airflow image ready${NC}"
+kind load docker-image fastapi-app:1.0.0 --name cncf-cluster
+echo -e "${GREEN}✅ Custom images loaded into Kind cluster${NC}"
 
 # Create namespaces
 echo -e "${BLUE}📦 Creating namespaces...${NC}"
