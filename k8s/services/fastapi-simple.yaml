@@ -24,129 +24,26 @@ spec:
         command: ["/bin/bash", "-c"]
         args:
           - |
-            pip install fastapi uvicorn sqlalchemy psycopg2-binary redis
-            mkdir -p /app
-            cat > /app/main.py << 'EOF'
-            from fastapi import FastAPI, HTTPException
-            from fastapi.middleware.cors import CORSMiddleware
-            import sqlalchemy as sa
-            from datetime import datetime
-            import json
-
-            app = FastAPI(title="Inquiry Automation API", version="1.0.0")
-
-            app.add_middleware(
-                CORSMiddleware,
-                allow_origins=["*"],
-                allow_credentials=True,
-                allow_methods=["*"],
-                allow_headers=["*"],
-            )
-
-            # Database connection
-            DATABASE_URL = "postgresql://postgres:postgres@postgresql.inquiries-system.svc.cluster.local:5432/inquiry_automation"
-            engine = sa.create_engine(DATABASE_URL)
-
-            @app.get("/")
-            async def root():
-                return {"message": "Inquiry Automation API", "status": "running"}
-
-            @app.get("/health")
-            async def health():
-                return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
-
-            @app.get("/inquiries")
-            async def get_inquiries():
-                try:
-                    with engine.connect() as conn:
-                        result = conn.execute(sa.text("SELECT * FROM inquiries ORDER BY timestamp DESC LIMIT 10"))
-                        inquiries = [dict(row._mapping) for row in result]
-                        return {"inquiries": inquiries, "count": len(inquiries)}
-                except Exception as e:
-                    raise HTTPException(status_code=500, detail=str(e))
-
-            @app.get("/stats")
-            async def get_stats():
-                try:
-                    with engine.connect() as conn:
-                        # Total inquiries
-                        total_result = conn.execute(sa.text("SELECT COUNT(*) as total FROM inquiries"))
-                        total = total_result.fetchone()[0]
-                        
-                        # Processed inquiries
-                        processed_result = conn.execute(sa.text("SELECT COUNT(*) as processed FROM inquiries WHERE processed = true"))
-                        processed = processed_result.fetchone()[0]
-                        
-                        # By category
-                        category_result = conn.execute(sa.text("""
-                            SELECT p.category, COUNT(*) as count 
-                            FROM predictions p 
-                            GROUP BY p.category 
-                            ORDER BY count DESC
-                        """))
-                        categories = [{"category": row[0], "count": row[1]} for row in category_result]
-                        
-                        # By urgency
-                        urgency_result = conn.execute(sa.text("""
-                            SELECT p.urgency, COUNT(*) as count 
-                            FROM predictions p 
-                            GROUP BY p.urgency 
-                            ORDER BY count DESC
-                        """))
-                        urgencies = [{"urgency": row[0], "count": row[1]} for row in urgency_result]
-                        
-                        return {
-                            "total_inquiries": total,
-                            "processed_inquiries": processed,
-                            "processing_rate": round((processed / total * 100) if total > 0 else 0, 2),
-                            "categories": categories,
-                            "urgencies": urgencies,
-                            "timestamp": datetime.utcnow().isoformat()
-                        }
-                except Exception as e:
-                    raise HTTPException(status_code=500, detail=str(e))
-
-            @app.post("/inquiries")
-            async def create_inquiry(inquiry: dict):
-                try:
-                    import uuid
-                    inquiry_id = str(uuid.uuid4())
-                    
-                    with engine.connect() as conn:
-                        conn.execute(sa.text("""
-                            INSERT INTO inquiries (id, subject, body, sender_email, sender_name, timestamp, processed)
-                            VALUES (:id, :subject, :body, :sender_email, :sender_name, :timestamp, :processed)
-                        """), {
-                            "id": inquiry_id,
-                            "subject": inquiry.get("subject", "Test Inquiry"),
-                            "body": inquiry.get("body", "Test body"),
-                            "sender_email": inquiry.get("sender_email", "test@example.com"),
-                            "sender_name": inquiry.get("sender_name", "Test User"),
-                            "timestamp": datetime.utcnow(),
-                            "processed": False
-                        })
-                        conn.commit()
-                    
-                    return {"id": inquiry_id, "status": "created", "message": "Inquiry created successfully"}
-                except Exception as e:
-                    raise HTTPException(status_code=500, detail=str(e))
-
-            if __name__ == "__main__":
-                import uvicorn
-                uvicorn.run(app, host="0.0.0.0", port=8000)
-            EOF
+            pip install fastapi uvicorn sqlalchemy psycopg2-binary redis prometheus-client pydantic scikit-learn transformers torch
             cd /app
-            python main.py
+            uvicorn src.api.main:app --host 0.0.0.0 --port 8000
         env:
         - name: DATABASE_URL
           value: "postgresql://postgres:postgres@postgresql.inquiries-system.svc.cluster.local:5432/inquiry_automation"
+        volumeMounts:
+        - name: app-code
+          mountPath: /app
         resources:
           requests:
-            memory: "256Mi"
-            cpu: "100m"
-          limits:
             memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
             cpu: "500m"
+      volumes:
+      - name: app-code
+        configMap:
+          name: streamlit-app-code
 ---
 apiVersion: v1
 kind: Service
