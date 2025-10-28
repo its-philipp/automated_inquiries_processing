@@ -25,6 +25,7 @@ spec:
         args:
           - |
             pip install fastapi uvicorn sqlalchemy psycopg2-binary redis
+            mkdir -p /app
             cat > /app/main.py << 'EOF'
             from fastapi import FastAPI, HTTPException
             from fastapi.middleware.cors import CORSMiddleware
