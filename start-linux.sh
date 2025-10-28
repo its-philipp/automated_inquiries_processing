@@ -376,15 +376,19 @@ spec:
 EOF
 echo "  ✅ PostgreSQL DNS alias created"
 
-# Deploy Airflow with optimized configuration (includes BERT models and proper memory limits)
-echo "  🚀 Deploying Airflow with BERT-enabled image and DAGs..."
+# Initialize Airflow database schema BEFORE deploying pods
+echo "  🗄️  Initializing Airflow database schema FIRST..."
+kubectl run airflow-init --rm -i --restart=Never --image=airflow-ml:2.7.3 -n airflow -- \
+  airflow db init 2>/dev/null || echo "  ⚠️  Database might already be initialized"
+echo "  ✅ Airflow database schema initialized"
 
-# Create ConfigMaps first
+# Create ConfigMaps
 echo "  📋 Creating ConfigMaps..."
 kubectl create configmap airflow-dags --from-file=airflow/dags/ -n airflow --dry-run=client -o yaml | kubectl apply -f - 2>/dev/null || true
 echo "  ✅ ConfigMaps created"
 
 # Deploy Airflow using optimized YAML with custom image and increased memory
+echo "  🚀 Deploying Airflow..."
 kubectl apply -f k8s/airflow/airflow-with-dags-fix.yaml
 
 # Wait for Airflow to be ready
@@ -392,27 +396,8 @@ echo "  ⏳ Waiting for Airflow pods to be ready..."
 kubectl wait --for=condition=ready pod -l app=airflow-webserver -n airflow --timeout=120s
 kubectl wait --for=condition=ready pod -l app=airflow-scheduler -n airflow --timeout=120s
 
-# Initialize Airflow database schema
-echo "  🗄️  Initializing Airflow database schema..."
+# Get Airflow pod for admin user creation
 AIRFLOW_POD=$(kubectl get pods -n airflow -l app=airflow-webserver -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-if [ -n "$AIRFLOW_POD" ]; then
-    kubectl exec -n airflow $AIRFLOW_POD -- airflow db migrate 2>/dev/null || echo "  ⚠️  Database migration might have already been done"
-    echo "  ✅ Airflow database schema initialized"
-    
-    # Wait for DB to be fully ready
-    echo "  ⏳ Waiting for database to be fully operational..."
-    for i in {1..10}; do
-        if kubectl exec -n airflow $AIRFLOW_POD -- airflow db check 2>/dev/null | grep -q "healthy"; then
-            echo "  ✅ Database is fully operational"
-            break
-        fi
-        if [ $i -eq 10 ]; then
-            echo "  ✅ Database check completed (proceeding with user creation)"
-            break
-        fi
-        sleep 1
-    done
-fi
 
 # Create Airflow admin user
 echo "  👤 Creating Airflow admin user..."
