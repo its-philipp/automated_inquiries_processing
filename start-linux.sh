@@ -579,7 +579,7 @@ done
 # Deploy applications
 echo -e "${BLUE}🚀 Deploying applications...${NC}"
 kubectl apply -f k8s/services/streamlit-dashboard.yaml 2>/dev/null || true
-kubectl apply -f k8s/services/fastapi-simple.yaml 2>/dev/null || true
+  kubectl apply -f k8s/services/fastapi.yaml 2>/dev/null || true
 
 # Wait for Streamlit with retry
 for i in {1..3}; do
@@ -679,7 +679,7 @@ nohup kubectl port-forward -n argocd svc/argocd-server 30009:443 > /tmp/pf-argoc
 sleep 3
 
 echo "  🔌 Starting FastAPI port-forward..."
-nohup kubectl port-forward -n inquiries-system svc/fastapi-simple 8000:8000 > /tmp/pf-fastapi.log 2>&1 &
+nohup kubectl port-forward -n inquiries-system svc/fastapi 8000:8000 > /tmp/pf-fastapi.log 2>&1 &
 sleep 5  # Extra time for all to stabilize
 
 # Verify port forwards are running

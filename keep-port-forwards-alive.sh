@@ -5,7 +5,7 @@
 
 SERVICES=(
     "inquiries-system:streamlit-dashboard:8501:8501"
-    "inquiries-system:fastapi-simple:8000:8000"
+    "inquiries-system:fastapi:8000:8000"
     "monitoring:prometheus-grafana:3000:80"
     "airflow:airflow-webserver:8080:8080"
     "argocd:argocd-server:30009:443"

@@ -63,7 +63,7 @@ k8s/
 │   └── grafana-dashboard.yaml         # Grafana dashboard config
 └── services/
     ├── streamlit-dashboard.yaml       # ✅ ACTIVE - Streamlit deployment
-    └── fastapi-simple.yaml            # FastAPI backend
+    └── fastapi.yaml            # FastAPI backend
 ```
 
 ### What Each File Does

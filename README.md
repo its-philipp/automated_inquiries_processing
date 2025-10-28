@@ -126,7 +126,7 @@ automated_inquiries_processing/
 │   │   └── gateway-fix.yaml            # Service mesh gateway
 │   └── services/
 │       ├── streamlit-dashboard.yaml    # ✅ 2 replicas via GitOps
-│       └── fastapi-simple.yaml
+│       └── fastapi.yaml
 │
 ├── airflow/dags/                      # Airflow workflows
 │   ├── batch_classify.py              # ✅ Adaptive BERT/rule-based

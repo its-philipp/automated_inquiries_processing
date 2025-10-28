@@ -25,7 +25,7 @@
 - ✅ `k8s/database/init-database-job.yaml` - DB initialization
 - ✅ `k8s/istio/gateway-fix.yaml` - Istio gateway (ACTIVE)
 - ✅ `k8s/services/streamlit-dashboard.yaml` - Streamlit deployment
-- ✅ `k8s/services/fastapi-simple.yaml` - FastAPI deployment
+- ✅ `k8s/services/fastapi.yaml` - FastAPI deployment
 
 ### **Application Code (Keep All)**
 - ✅ `src/` - All source code
@@ -66,7 +66,7 @@
 - ❌ `k8s/istio/destinationrule.yaml` - Not used
 - ❌ `k8s/istio/gateway.yaml` - Use gateway-fix.yaml
 - ❌ `k8s/istio/virtualservice.yaml` - Replaced by gateway-fix
-- ❌ `k8s/services/fastapi-app.yaml` - Use fastapi-simple.yaml
+- ❌ `k8s/services/fastapi-app.yaml` - Use fastapi.yaml
 - ❌ `k8s/services/python-app.yaml` - Not used
 - ❌ `k8s/helm/` - Charts managed by Helm repos, not local
 
@@ -111,7 +111,7 @@ automated_inquiries_processing/
 │   │   └── gateway-fix.yaml
 │   └── services/
 │       ├── streamlit-dashboard.yaml
-│       └── fastapi-simple.yaml
+│       └── fastapi.yaml
 │
 ├── src/                              # Application code
 ├── airflow/
