@@ -553,6 +553,7 @@ echo -e "\n${GREEN}🎉 Complete CNCF Stack Ready!${NC}"
 echo "========================"
 echo -e "\n${YELLOW}📊 Access Your Complete CNCF Stack:${NC}"
 echo "  • Streamlit Dashboard: http://localhost:8501"
+echo "  • FastAPI Backend:     http://localhost:8000 (Swagger: /docs)"
 echo "  • Grafana Monitoring:  http://localhost:3000 (admin/admin)"
 echo "  • Airflow DAGs:        http://localhost:8080 (admin/admin)"
 echo "  • ArgoCD GitOps:       https://localhost:30009 (admin/<get-password>)"
@@ -612,15 +613,19 @@ sleep 3
 
 echo "  🔌 Starting ArgoCD port-forward..."
 nohup kubectl port-forward -n argocd svc/argocd-server 30009:443 > /tmp/pf-argocd.log 2>&1 &
+sleep 3
+
+echo "  🔌 Starting FastAPI port-forward..."
+nohup kubectl port-forward -n inquiries-system svc/fastapi-simple 8000:8000 > /tmp/pf-fastapi.log 2>&1 &
 sleep 5  # Extra time for all to stabilize
 
 # Verify port forwards are running
 echo "  🔍 Verifying port forwards..."
 PORT_FORWARDS=$(ps aux | grep "kubectl port-forward" | grep -v grep | wc -l)
-if [ "$PORT_FORWARDS" -ge 4 ]; then
+if [ "$PORT_FORWARDS" -ge 5 ]; then
     echo "  ✅ All $PORT_FORWARDS port forwards active"
 else
-    echo "  ⚠️  Only $PORT_FORWARDS/4 port forwards active"
+    echo "  ⚠️  Only $PORT_FORWARDS/5 port forwards active"
     echo "  💡 Some port-forwards may need manual restart"
     echo "  💡 Run: ./keep-port-forwards-alive.sh in another terminal"
 fi
