@@ -380,9 +380,18 @@ spec:
       labels:
         app: airflow-webserver
     spec:
+      initContainers:
+      - name: copy-dags
+        image: busybox
+        command: ['sh', '-c', 'cp -rL /dags-source/* /dags-dest/ && ls -la /dags-dest/']
+        volumeMounts:
+        - name: dags-source
+          mountPath: /dags-source
+        - name: dags
+          mountPath: /dags-dest
       containers:
       - name: webserver
-        image: apache/airflow:2.7.3-python3.11
+        image: airflow-ml:2.7.3
         ports:
         - containerPort: 8080
         command: ["airflow", "webserver", "--port", "8080", "--host", "0.0.0.0"]
@@ -392,15 +401,23 @@ spec:
         - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
           value: "postgresql://postgres:postgres@postgresql.inquiries-system.svc.cluster.local:5432/airflow"
         - name: AIRFLOW__CORE__DAGS_FOLDER
-          value: "/tmp"  # Temporary folder to avoid ConfigMap issues during init
+          value: "/opt/airflow/dags"  # Use DAGs folder with proper mount
         - name: AIRFLOW__CORE__LOAD_EXAMPLES
           value: "False"
+        - name: AIRFLOW__CORE__LOAD_DEFAULT_CONNECTIONS
+          value: "False"
+        - name: AIRFLOW__CLI__ENABLE_LAZY_LOADING
+          value: "True"
         - name: AIRFLOW__WEBSERVER__SECRET_KEY
           value: "airflow-secret-key-2024"
         - name: AIRFLOW__CORE__FERNET_KEY
           value: "sVy65SeclhVH4L71cdB4tJfI7aZptw-N6hXyEpobOnY="
         - name: AIRFLOW__WEBSERVER__EXPOSE_CONFIG
           value: "True"
+        volumeMounts:
+        - name: dags
+          mountPath: /opt/airflow/dags
+          readOnly: true
         resources:
           requests:
             memory: "512Mi"
@@ -408,6 +425,12 @@ spec:
           limits:
             memory: "1Gi"
             cpu: "400m"
+      volumes:
+      - name: dags-source
+        configMap:
+          name: airflow-dags
+      - name: dags
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -438,9 +461,18 @@ spec:
       labels:
         app: airflow-scheduler
     spec:
+      initContainers:
+      - name: copy-dags
+        image: busybox
+        command: ['sh', '-c', 'cp -rL /dags-source/* /dags-dest/ && ls -la /dags-dest/']
+        volumeMounts:
+        - name: dags-source
+          mountPath: /dags-source
+        - name: dags
+          mountPath: /dags-dest
       containers:
       - name: scheduler
-        image: apache/airflow:2.7.3-python3.11
+        image: airflow-ml:2.7.3
         command: ["airflow", "scheduler"]
         env:
         - name: AIRFLOW__CORE__EXECUTOR
@@ -448,13 +480,21 @@ spec:
         - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
           value: "postgresql://postgres:postgres@postgresql.inquiries-system.svc.cluster.local:5432/airflow"
         - name: AIRFLOW__CORE__DAGS_FOLDER
-          value: "/tmp"  # Temporary folder to avoid ConfigMap issues during init
+          value: "/opt/airflow/dags"  # Use DAGs folder from the start
         - name: AIRFLOW__CORE__LOAD_EXAMPLES
           value: "False"
+        - name: AIRFLOW__CORE__LOAD_DEFAULT_CONNECTIONS
+          value: "False"
+        - name: AIRFLOW__CLI__ENABLE_LAZY_LOADING
+          value: "True"
         - name: AIRFLOW__WEBSERVER__SECRET_KEY
           value: "airflow-secret-key-2024"
         - name: AIRFLOW__CORE__FERNET_KEY
           value: "sVy65SeclhVH4L71cdB4tJfI7aZptw-N6hXyEpobOnY="
+        volumeMounts:
+        - name: dags
+          mountPath: /opt/airflow/dags
+          readOnly: true
         resources:
           requests:
             memory: "512Mi"
@@ -462,6 +502,12 @@ spec:
           limits:
             memory: "1Gi"
             cpu: "400m"
+      volumes:
+      - name: dags-source
+        configMap:
+          name: airflow-dags
+      - name: dags
+        emptyDir: {}
 EOF
 
 # Wait for Airflow webserver to be ready
@@ -528,35 +574,11 @@ if [ -n "$AIRFLOW_POD" ]; then
     fi
 fi
 
-# Now create ConfigMaps and update Airflow to use DAGs
+# Create ConfigMaps (DAGs are already configured in the deployment spec above)
 echo "  📋 Creating ConfigMaps..."
 kubectl create configmap streamlit-app-code --from-file=inquiry_monitoring_dashboard.py --from-file=src/ --from-file=k8s/database/init-database-simple.py -n inquiries-system --dry-run=client -o yaml | kubectl apply -f - 2>/dev/null || true
 kubectl create configmap airflow-dags --from-file=airflow/dags/ -n airflow --dry-run=client -o yaml | kubectl apply -f - 2>/dev/null || true
 echo -e "${GREEN}✅ ConfigMaps created${NC}"
-
-# Update Airflow deployments to use DAGs folder
-echo "  🔄 Updating Airflow to use DAGs folder..."
-kubectl patch deployment airflow-webserver -n airflow -p '{"spec":{"template":{"spec":{"containers":[{"name":"webserver","env":[{"name":"AIRFLOW__CORE__DAGS_FOLDER","value":"/opt/airflow/dags"}]}]}}}}'
-kubectl patch deployment airflow-scheduler -n airflow -p '{"spec":{"template":{"spec":{"containers":[{"name":"scheduler","env":[{"name":"AIRFLOW__CORE__DAGS_FOLDER","value":"/opt/airflow/dags"}]}]}}}}'
-
-# Add volume mounts for DAGs
-kubectl patch deployment airflow-webserver -n airflow -p '{"spec":{"template":{"spec":{"containers":[{"name":"webserver","volumeMounts":[{"name":"dags","mountPath":"/opt/airflow/dags","readOnly":true}]}],"volumes":[{"name":"dags","configMap":{"name":"airflow-dags","defaultMode":493}}]}}}}'
-kubectl patch deployment airflow-scheduler -n airflow -p '{"spec":{"template":{"spec":{"containers":[{"name":"scheduler","volumeMounts":[{"name":"dags","mountPath":"/opt/airflow/dags","readOnly":true}]}],"volumes":[{"name":"dags","configMap":{"name":"airflow-dags","defaultMode":493}}]}}}}'
-
-# Wait for Airflow to restart with DAGs
-echo "  ⏳ Waiting for Airflow to restart with DAGs..."
-kubectl rollout restart deployment/airflow-webserver -n airflow
-kubectl rollout restart deployment/airflow-scheduler -n airflow
-kubectl wait --for=condition=ready pod -l app=airflow-webserver -n airflow --timeout=120s
-
-# Re-initialize database schema after restart (in case it was lost)
-echo "  🔄 Re-initializing database schema after restart..."
-AIRFLOW_POD=$(kubectl get pods -n airflow -l app=airflow-webserver -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-if [ -n "$AIRFLOW_POD" ]; then
-    kubectl exec -n airflow $AIRFLOW_POD -- airflow db migrate 2>/dev/null || echo "  ⚠️  Database migration might have already been done"
-    echo "  ✅ Database schema re-initialized"
-fi
-
 echo "  ✅ Airflow ready with DAGs"
 
 # Initialize application database
