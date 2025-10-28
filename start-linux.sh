@@ -378,9 +378,12 @@ echo "  ✅ PostgreSQL DNS alias created"
 
 # Initialize Airflow database schema BEFORE deploying pods
 echo "  🗄️  Initializing Airflow database schema FIRST..."
-kubectl run airflow-init --rm -i --restart=Never --image=airflow-ml:2.7.3 -n airflow \
+kubectl run airflow-init --restart=Never --image=airflow-ml:2.7.3 -n airflow \
   --env="AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql://postgres:postgres@postgresql.inquiries-system.svc.cluster.local:5432/airflow" \
   -- airflow db init 2>/dev/null || echo "  ⚠️  Database might already be initialized"
+
+kubectl wait --for=condition=complete job/airflow-init -n airflow --timeout=60s 2>/dev/null || kubectl wait --for=condition=ready pod/airflow-init -n airflow --timeout=60s 2>/dev/null || true
+kubectl delete pod airflow-init -n airflow 2>/dev/null || true
 echo "  ✅ Airflow database schema initialized"
 
 # Create ConfigMaps
