@@ -395,4 +395,59 @@ MIT License - See LICENSE file for details
 
 ---
 
+## 📸 Screenshots
+
+### Streamlit Dashboard Interface
+
+![Main Dashboard](screenshots/1-dashboard.png)
+*Main inquiry monitoring dashboard showing real-time statistics and metrics*
+
+![Dashboard Analytics](screenshots/2-dashboard2.png)
+*Analytics view with inquiry trends and processing rates*
+
+![Dashboard Detailed View](screenshots/3-dashboard3.png)
+*Detailed view of inquiry classifications and urgency levels*
+
+![Inquiry Details](screenshots/4-inquiry_details.png)
+*Individual inquiry detail view with classification results*
+
+![Submit Inquiry](screenshots/5-submit.png)
+*Submit new inquiry form with validation*
+
+### FastAPI Backend
+
+![FastAPI Swagger UI](screenshots/6-fastapi.png)
+*FastAPI interactive API documentation (Swagger UI)*
+
+### MLflow Model Tracking
+
+![MLflow Interface](screenshots/7-mlflow.png)
+*MLflow model registry and experiment tracking*
+
+### Airflow Workflow Orchestration
+
+![Airflow DAGs](screenshots/8-airflow.png)
+*Airflow DAG overview showing batch classification and model training workflows*
+
+### ArgoCD GitOps
+
+![ArgoCD Application Graph](screenshots/9-argocd_app_graph.png)
+*ArgoCD dependency graph showing GitOps-managed Kubernetes resources with automatic sync*
+
+### Grafana Monitoring Dashboards
+
+![Grafana Cluster Resources](screenshots/10-grafana_compute_resources_cluster.png)
+*Kubernetes cluster-wide compute resource monitoring*
+
+![Grafana Network Monitoring](screenshots/11-grafan_networking_cluster.png)
+*Cluster networking and traffic monitoring with Istio integration*
+
+![Grafana Prometheus Overview](screenshots/12-grafana_prometheus.png)
+*Prometheus metrics and alerting overview*
+
+![Grafana Pod Resources](screenshots/13-grafana_compute_resources_pods.png)
+*Pod-level CPU and memory resource monitoring for inquiries-system namespace*
+
+---
+
 **Built with ❤️ using Cloud Native technologies** 🚀
