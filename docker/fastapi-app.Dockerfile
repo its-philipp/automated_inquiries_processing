@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy requirements and install Python dependencies
 COPY pyproject.toml ./
+# First install non-PyTorch packages
 RUN pip install --no-cache-dir \
     fastapi==0.120.1 \
     uvicorn==0.38.0 \
@@ -20,11 +21,13 @@ RUN pip install --no-cache-dir \
     pydantic==2.12.3 \
     pydantic[email] \
     scikit-learn==1.7.2 \
-    transformers==4.57.1 \
-    torch==2.9.0 \
     beautifulsoup4==4.13.1 \
     mlflow==2.19.0 \
     pyyaml==6.0.3
+# Then install CPU-only PyTorch from specialized index
+RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch==2.9.0
+# Finally install transformers (which depends on torch)
+RUN pip install --no-cache-dir transformers==4.57.1
 
 # Copy application code
 COPY src/ /app/src/
