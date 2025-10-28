@@ -237,6 +237,11 @@ helm upgrade --install argocd argo/argo-cd \
 
 echo -e "${GREEN}✅ ArgoCD deployed${NC}"
 
+# Deploy ArgoCD Application for GitOps
+echo -e "${BLUE}🔄 Creating ArgoCD Application for GitOps...${NC}"
+kubectl apply -f k8s/argocd/streamlit-gitops.yaml
+echo -e "${GREEN}✅ ArgoCD Application created (streamlit-dashboard-gitops)${NC}"
+
 # Deploy Prometheus Stack
 echo -e "${BLUE}📈 Deploying Prometheus Stack...${NC}"
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts 2>/dev/null || true
@@ -535,7 +540,7 @@ echo -e "\n${YELLOW}📊 Access Your Complete CNCF Stack:${NC}"
 echo "  • Streamlit Dashboard: http://localhost:8501"
 echo "  • Grafana Monitoring:  http://localhost:3000 (admin/admin)"
 echo "  • Airflow DAGs:        http://localhost:8080 (admin/admin)"
-echo "  • ArgoCD GitOps:       https://localhost:30009 (admin/argocd)"
+echo "  • ArgoCD GitOps:       https://localhost:30009 (admin/<get-password>)"
 echo "  • Istio Gateway:       http://localhost:30080"
 echo ""
 echo -e "${YELLOW}🔄 Available DAGs in Airflow:${NC}"
@@ -555,8 +560,11 @@ echo "  • Proper DAG mounting to avoid ConfigMap loops"
 echo "  • Admin user creation with error handling"
 echo "  • Schema migration with proper timing"
 echo ""
+echo -e "${YELLOW}🔑 Get ArgoCD Admin Password:${NC}"
+echo "  kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath=\"{.data.password}\" | base64 -d && echo"
+echo ""
 echo -e "${YELLOW}🛑 To stop all services:${NC}"
-echo "  ./stop-cncf.sh"
+echo "  ./stop.sh"
 echo ""
 echo -e "${GREEN}✨ Your bulletproof CNCF-based inquiry automation pipeline is ready!${NC}"
 echo -e "${BLUE}💡 Full CNCF stack with robust error handling and proper Airflow initialization${NC}"
