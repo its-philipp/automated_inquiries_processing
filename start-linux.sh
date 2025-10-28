@@ -367,12 +367,13 @@ echo "  📋 Creating ConfigMaps..."
 kubectl create configmap airflow-dags --from-file=airflow/dags/ -n airflow --dry-run=client -o yaml | kubectl apply -f - 2>/dev/null || true
 
 # Deploy Airflow using the same optimized YAML file as macOS
-echo "  🚀 Deploying Airflow (without DAGs for initialization)..."
+echo "  🚀 Deploying Airflow..."
 kubectl apply -f k8s/airflow/airflow-with-dags-fix.yaml
 
-# Wait for Airflow webserver to be ready
-echo "  ⏳ Waiting for Airflow webserver to be ready..."
+# Wait for Airflow to be ready
+echo "  ⏳ Waiting for Airflow pods to be ready..."
 kubectl wait --for=condition=ready pod -l app=airflow-webserver -n airflow --timeout=120s
+kubectl wait --for=condition=ready pod -l app=airflow-scheduler -n airflow --timeout=120s
 
 # Initialize Airflow database schema
 echo "  🗄️  Initializing Airflow database schema..."
@@ -381,7 +382,7 @@ if [ -n "$AIRFLOW_POD" ]; then
     kubectl exec -n airflow $AIRFLOW_POD -- airflow db migrate 2>/dev/null || echo "  ⚠️  Database migration might have already been done"
     echo "  ✅ Airflow database schema initialized"
     
-    # Wait for DB to be fully ready (check if we can query the database)
+    # Wait for DB to be fully ready
     echo "  ⏳ Waiting for database to be fully operational..."
     for i in {1..10}; do
         if kubectl exec -n airflow $AIRFLOW_POD -- airflow db check 2>/dev/null | grep -q "healthy"; then
@@ -394,9 +395,6 @@ if [ -n "$AIRFLOW_POD" ]; then
         fi
         sleep 1
     done
-else
-    echo "  ❌ Airflow pod not found for schema initialization"
-    exit 1
 fi
 
 # Create Airflow admin user
@@ -584,10 +582,12 @@ fi
 
 # Verify services are accessible
 echo "  🔍 Verifying service accessibility..."
+sleep 5  # Give services time to stabilize
+
 if curl -s -o /dev/null -w "%{http_code}" http://localhost:8501/ | grep -q "200"; then
     echo "  ✅ Streamlit dashboard accessible at http://localhost:8501"
 else
-    echo "  ⚠️  Streamlit dashboard starting up..."
+    echo "  ⚠️  Streamlit dashboard starting up (may take a minute)..."
 fi
 
 if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/ | grep -q "200\|302"; then

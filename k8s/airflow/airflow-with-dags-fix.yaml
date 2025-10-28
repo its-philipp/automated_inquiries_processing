@@ -14,6 +14,13 @@ spec:
         app: airflow-webserver
     spec:
       initContainers:
+      - name: db-init
+        image: airflow-ml:2.7.3
+        imagePullPolicy: Never
+        command: ['sh', '-c', 'airflow db init || true']
+        env:
+        - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+          value: "postgresql://postgres:postgres@postgresql.inquiries-system.svc.cluster.local:5432/airflow"
       - name: copy-dags
         image: busybox
         command: ['sh', '-c', 'cp -rL /dags-source/* /dags-dest/ && ls -la /dags-dest/']
