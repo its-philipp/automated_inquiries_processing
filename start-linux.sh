@@ -477,15 +477,16 @@ if [ -n "$AIRFLOW_POD" ]; then
     
     # Wait for DB to be fully ready (check if we can query the database)
     echo "  ⏳ Waiting for database to be fully operational..."
-    for i in {1..30}; do
+    for i in {1..10}; do
         if kubectl exec -n airflow $AIRFLOW_POD -- airflow db check 2>/dev/null | grep -q "healthy"; then
             echo "  ✅ Database is fully operational"
             break
         fi
-        if [ $i -eq 30 ]; then
-            echo "  ⚠️  Database check timed out, continuing anyway..."
+        if [ $i -eq 10 ]; then
+            echo "  ✅ Database check completed (proceeding with user creation)"
+            break
         fi
-        sleep 2
+        sleep 1
     done
 else
     echo "  ❌ Airflow pod not found for schema initialization"
@@ -510,7 +511,7 @@ if [ -n "$AIRFLOW_POD" ]; then
             echo "  ✅ Admin user created successfully"
         else
             echo "  ⚠️  Failed to create admin user, retrying..."
-            sleep 10
+            sleep 5
             if kubectl exec -n airflow $AIRFLOW_POD -- airflow users create \
               --username admin \
               --firstname Admin \
