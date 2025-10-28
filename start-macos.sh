@@ -524,7 +524,8 @@ done
 
 # Deploy Istio Gateway and VirtualService
 echo -e "${BLUE}🌐 Configuring Istio routing...${NC}"
-kubectl apply -f k8s/istio/gateway.yaml 2>/dev/null || true
+kubectl apply -f k8s/istio/gateway-fix.yaml
+echo -e "${GREEN}✅ Istio Gateway configured${NC}"
 kubectl apply -f k8s/istio/virtualservice.yaml 2>/dev/null || true
 
 # Wait for all services to be fully ready
