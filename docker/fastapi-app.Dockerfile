@@ -18,9 +18,13 @@ RUN pip install --no-cache-dir \
     redis==7.0.1 \
     prometheus-client==0.23.1 \
     pydantic==2.12.3 \
+    pydantic[email] \
     scikit-learn==1.7.2 \
     transformers==4.57.1 \
-    torch==2.9.0
+    torch==2.9.0 \
+    beautifulsoup4==4.13.1 \
+    mlflow==2.19.0 \
+    pyyaml==6.0.3
 
 # Copy application code
 COPY src/ /app/src/
