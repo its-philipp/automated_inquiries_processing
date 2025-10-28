@@ -449,6 +449,19 @@ AIRFLOW_POD=$(kubectl get pods -n airflow -l app=airflow-webserver -o jsonpath='
 if [ -n "$AIRFLOW_POD" ]; then
     kubectl exec -n airflow $AIRFLOW_POD -- airflow db migrate 2>/dev/null || echo "  ⚠️  Database migration might have already been done"
     echo "  ✅ Airflow database schema initialized"
+    
+    # Wait for DB to be fully ready (check if we can query the database)
+    echo "  ⏳ Waiting for database to be fully operational..."
+    for i in {1..30}; do
+        if kubectl exec -n airflow $AIRFLOW_POD -- airflow db check 2>/dev/null | grep -q "healthy"; then
+            echo "  ✅ Database is fully operational"
+            break
+        fi
+        if [ $i -eq 30 ]; then
+            echo "  ⚠️  Database check timed out, continuing anyway..."
+        fi
+        sleep 2
+    done
 fi
 
 # Create Airflow admin user
@@ -469,15 +482,19 @@ if [ -n "$AIRFLOW_POD" ]; then
             echo "  ✅ Admin user created successfully"
         else
             echo "  ⚠️  Failed to create admin user, retrying..."
-            sleep 5
-            kubectl exec -n airflow $AIRFLOW_POD -- airflow users create \
+            sleep 10
+            if kubectl exec -n airflow $AIRFLOW_POD -- airflow users create \
               --username admin \
               --firstname Admin \
               --lastname User \
               --role Admin \
               --email admin@example.com \
-              --password admin 2>&1
-            echo "  ✅ Admin user created on retry"
+              --password admin 2>&1 | grep -q "created\|Added user"; then
+                echo "  ✅ Admin user created on retry"
+            else
+                echo "  ⚠️  Could not create admin user - you can create it manually later"
+                echo "  💡 Run: kubectl exec -n airflow \$AIRFLOW_POD -- airflow users create --username admin --password admin --role Admin"
+            fi
         fi
     fi
     
@@ -581,6 +598,20 @@ echo ""
 echo -e "${YELLOW}🔑 Get ArgoCD Admin Password:${NC}"
 echo "  kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath=\"{.data.password}\" | base64 -d && echo"
 echo ""
+
+# Check if Airflow admin user exists and provide manual instructions if needed
+AIRFLOW_POD=$(kubectl get pods -n airflow -l app=airflow-webserver -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+if [ -n "$AIRFLOW_POD" ]; then
+    if ! kubectl exec -n airflow $AIRFLOW_POD -- airflow users list 2>/dev/null | grep -q "admin"; then
+        echo -e "${YELLOW}⚠️  Airflow Admin User Not Created${NC}"
+        echo "  If Airflow login fails, create the admin user manually:"
+        echo -e "${BLUE}  kubectl exec -n airflow $AIRFLOW_POD -- airflow users create \\${NC}"
+        echo -e "${BLUE}    --username admin --password admin --firstname Admin \\${NC}"
+        echo -e "${BLUE}    --lastname User --role Admin --email admin@example.com${NC}"
+        echo ""
+    fi
+fi
+
 echo -e "${YELLOW}🛑 To stop all services:${NC}"
 echo "  ./stop.sh"
 echo ""

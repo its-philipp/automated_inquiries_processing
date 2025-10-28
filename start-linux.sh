@@ -474,6 +474,19 @@ AIRFLOW_POD=$(kubectl get pods -n airflow -l app=airflow-webserver -o jsonpath='
 if [ -n "$AIRFLOW_POD" ]; then
     kubectl exec -n airflow $AIRFLOW_POD -- airflow db migrate 2>/dev/null || echo "  ⚠️  Database migration might have already been done"
     echo "  ✅ Airflow database schema initialized"
+    
+    # Wait for DB to be fully ready (check if we can query the database)
+    echo "  ⏳ Waiting for database to be fully operational..."
+    for i in {1..30}; do
+        if kubectl exec -n airflow $AIRFLOW_POD -- airflow db check 2>/dev/null | grep -q "healthy"; then
+            echo "  ✅ Database is fully operational"
+            break
+        fi
+        if [ $i -eq 30 ]; then
+            echo "  ⚠️  Database check timed out, continuing anyway..."
+        fi
+        sleep 2
+    done
 else
     echo "  ❌ Airflow pod not found for schema initialization"
     exit 1
@@ -481,14 +494,38 @@ fi
 
 # Create Airflow admin user
 echo "  👤 Creating Airflow admin user..."
-kubectl exec -n airflow $AIRFLOW_POD -- airflow users create \
-  --username admin \
-  --firstname Admin \
-  --lastname User \
-  --role Admin \
-  --email admin@example.com \
-  --password admin 2>/dev/null || echo "  ⚠️  Admin user might already exist"
-echo "  ✅ Airflow admin user created"
+if [ -n "$AIRFLOW_POD" ]; then
+    # Check if admin user already exists
+    if kubectl exec -n airflow $AIRFLOW_POD -- airflow users list 2>/dev/null | grep -q "admin"; then
+        echo "  ✅ Admin user already exists"
+    else
+        # Create admin user with proper error handling
+        if kubectl exec -n airflow $AIRFLOW_POD -- airflow users create \
+          --username admin \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@example.com \
+          --password admin 2>&1 | grep -q "created\|Added user"; then
+            echo "  ✅ Admin user created successfully"
+        else
+            echo "  ⚠️  Failed to create admin user, retrying..."
+            sleep 10
+            if kubectl exec -n airflow $AIRFLOW_POD -- airflow users create \
+              --username admin \
+              --firstname Admin \
+              --lastname User \
+              --role Admin \
+              --email admin@example.com \
+              --password admin 2>&1 | grep -q "created\|Added user"; then
+                echo "  ✅ Admin user created on retry"
+            else
+                echo "  ⚠️  Could not create admin user - you can create it manually later"
+                echo "  💡 Run: kubectl exec -n airflow \$AIRFLOW_POD -- airflow users create --username admin --password admin --role Admin"
+            fi
+        fi
+    fi
+fi
 
 # Now create ConfigMaps and update Airflow to use DAGs
 echo "  📋 Creating ConfigMaps..."
