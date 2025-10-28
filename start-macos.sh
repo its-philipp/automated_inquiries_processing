@@ -257,6 +257,11 @@ helm upgrade --install prometheus prometheus-community/kube-prometheus-stack \
 
 echo -e "${GREEN}✅ Prometheus Stack deployed${NC}"
 
+# Deploy custom Grafana dashboard
+echo -e "${BLUE}📊 Deploying custom Inquiry Processing dashboard to Grafana...${NC}"
+kubectl apply -f k8s/monitoring/grafana-dashboard.yaml
+echo -e "${GREEN}✅ Custom Grafana dashboard deployed${NC}"
+
 # Deploy PostgreSQL
 echo -e "${BLUE}📊 Deploying PostgreSQL...${NC}"
 kubectl apply -f - <<EOF
