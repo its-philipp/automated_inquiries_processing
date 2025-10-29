@@ -400,6 +400,10 @@ echo "  ⏳ Waiting for Airflow pods to be ready..."
 kubectl wait --for=condition=ready pod -l app=airflow-webserver -n airflow --timeout=120s
 kubectl wait --for=condition=ready pod -l app=airflow-scheduler -n airflow --timeout=120s
 
+# Wait a bit more for Airflow to fully initialize after pods are ready
+echo "  ⏳ Waiting for Airflow to fully initialize..."
+sleep 10
+
 # Get Airflow pod for admin user creation
 AIRFLOW_POD=$(kubectl get pods -n airflow -l app=airflow-webserver -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 
