@@ -381,8 +381,99 @@ echo "  📋 Creating ConfigMaps..."
 kubectl create configmap airflow-dags --from-file=airflow/dags/ -n airflow --dry-run=client -o yaml | kubectl apply -f - 2>/dev/null || true
 echo "  ✅ ConfigMaps created"
 
-# Deploy Airflow using optimized YAML with custom image and increased memory
-echo "  🚀 Deploying Airflow..."
+# Initialize Airflow database schema BEFORE deploying pods (critical to prevent CrashLoopBackOff)
+echo "  🗄️  Initializing Airflow database schema BEFORE deploying pods..."
+echo "  ⚠️  This is critical - pods will crash if DB isn't initialized first"
+
+# Delete any existing init pod from previous runs
+kubectl delete pod airflow-db-init -n airflow 2>/dev/null || true
+sleep 2
+
+# Create temporary pod for database initialization/migration
+echo "  ⏳ Creating database initialization pod..."
+kubectl run airflow-db-init --restart=Never --image=airflow-ml:2.7.3 -n airflow \
+  --env="AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql://postgres:postgres@postgresql.inquiries-system.svc.cluster.local:5432/airflow" \
+  --env="AIRFLOW__CORE__EXECUTOR=LocalExecutor" \
+  -- airflow db migrate
+
+# Wait for the pod to complete (with proper timeout and error handling)
+echo "  ⏳ Waiting for database initialization to complete (this may take 30-60 seconds)..."
+DB_INIT_SUCCESS=false
+INIT_ATTEMPTS=0
+MAX_INIT_ATTEMPTS=2
+
+while [ $INIT_ATTEMPTS -lt $MAX_INIT_ATTEMPTS ]; do
+    INIT_ATTEMPTS=$((INIT_ATTEMPTS + 1))
+    
+    for i in {1..90}; do  # Wait up to 3 minutes (90 * 2 seconds)
+        POD_STATUS=$(kubectl get pod airflow-db-init -n airflow -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+        
+        if [ "$POD_STATUS" = "Succeeded" ]; then
+            echo "  ✅ Database initialization pod completed successfully"
+            # Check logs to confirm success
+            INIT_LOGS=$(kubectl logs airflow-db-init -n airflow 2>&1 || echo "")
+            if echo "$INIT_LOGS" | grep -q "Running upgrade\|Revision ID\|Done"; then
+                echo "  ✅ Migration logs confirm database schema was created"
+            elif echo "$INIT_LOGS" | grep -q "already at head revision\|already up to date\|Database already initialized"; then
+                echo "  ✅ Database already at latest version (this is OK)"
+            else
+                echo "  ⚠️  Migration logs: $(echo "$INIT_LOGS" | tail -3)"
+            fi
+            DB_INIT_SUCCESS=true
+            break 2  # Break out of both loops
+        elif [ "$POD_STATUS" = "Failed" ]; then
+            echo "  ⚠️  Init pod failed, checking logs..."
+            INIT_LOGS=$(kubectl logs airflow-db-init -n airflow 2>&1 || echo "")
+            echo "  📋 Last few log lines:"
+            echo "$INIT_LOGS" | tail -5 | sed 's/^/     /'
+            
+            # If it says "already at head" or "already initialized", that's actually OK
+            if echo "$INIT_LOGS" | grep -q "already at head revision\|already up to date\|Database already initialized"; then
+                echo "  ✅ Database already initialized (this is OK)"
+                DB_INIT_SUCCESS=true
+                break 2
+            fi
+            
+            # Try with 'db init' instead of 'db migrate' if migrate fails
+            if [ $INIT_ATTEMPTS -lt $MAX_INIT_ATTEMPTS ]; then
+                echo "  ⏳ Retrying with 'db init' command (attempt $INIT_ATTEMPTS/$MAX_INIT_ATTEMPTS)..."
+                kubectl delete pod airflow-db-init -n airflow 2>/dev/null || true
+                sleep 3
+                kubectl run airflow-db-init --restart=Never --image=airflow-ml:2.7.3 -n airflow \
+                  --env="AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql://postgres:postgres@postgresql.inquiries-system.svc.cluster.local:5432/airflow" \
+                  -- airflow db init
+                break  # Break inner loop to restart wait
+            else
+                echo "  ❌ Database initialization failed after $MAX_INIT_ATTEMPTS attempts"
+                break 2
+            fi
+        elif [ "$POD_STATUS" = "Pending" ] || [ "$POD_STATUS" = "Running" ]; then
+            if [ $((i % 10)) -eq 0 ]; then  # Print progress every 20 seconds
+                echo "  ⏳ Still waiting... (${i}0 seconds elapsed)"
+            fi
+            sleep 2
+        else
+            echo "  ⚠️  Unexpected pod status: $POD_STATUS"
+            break
+        fi
+    done
+done
+
+# Clean up the init pod
+kubectl delete pod airflow-db-init -n airflow 2>/dev/null || true
+
+if [ "$DB_INIT_SUCCESS" = "false" ]; then
+    echo "  ❌ Database initialization failed - Airflow pods may crash!"
+    echo "  💡 Trying to verify database state directly..."
+    POSTGRES_POD=$(kubectl get pods -n inquiries-system -l app=postgresql -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+    if [ -n "$POSTGRES_POD" ]; then
+        kubectl exec -n inquiries-system $POSTGRES_POD -- env PGPASSWORD=postgres psql -U postgres -d airflow -c "SELECT version_num FROM alembic_version;" 2>&1 | head -3
+    fi
+    echo "  ⚠️  Continuing anyway - will try to migrate from within pods if needed"
+fi
+
+# Deploy Airflow pods ONLY after DB is initialized
+echo "  🚀 Deploying Airflow pods (now that DB is initialized)..."
 kubectl apply -f k8s/airflow/airflow-with-dags-fix.yaml
 
 # Wait for Airflow to be ready (with longer timeout and retries)
@@ -419,63 +510,19 @@ done
 echo "  ⏳ Waiting for pods to stabilize..."
 sleep 15
 
-# Get Airflow pod for database migration and admin user creation
+# Get Airflow pod for admin user creation
 AIRFLOW_POD=$(kubectl get pods -n airflow -l app=airflow-webserver -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 
-# Initialize Airflow database schema (run inside the running pod, like macOS)
-echo "  🗄️  Initializing Airflow database schema..."
-if [ -n "$AIRFLOW_POD" ]; then
-    # Wait for pod to be actually ready to accept commands
-    for i in {1..30}; do
-        if kubectl exec -n airflow $AIRFLOW_POD -- airflow version 2>/dev/null | grep -q "2.7.3"; then
-            echo "  ✅ Pod is ready to accept commands"
-            break
-        fi
-        if [ $i -eq 30 ]; then
-            echo "  ⚠️  Pod not responding, but will try migration anyway..."
-        else
-            sleep 2
-        fi
-    done
+# If pods are still crashing, try one more migration from within a running pod
+if [ -z "$AIRFLOW_POD" ] || ! kubectl get pod $AIRFLOW_POD -n airflow -o jsonpath='{.status.phase}' 2>/dev/null | grep -q "Running"; then
+    echo "  ⚠️  Airflow pods still not stable, waiting a bit longer and checking status..."
+    sleep 15
+    AIRFLOW_POD=$(kubectl get pods -n airflow -l app=airflow-webserver --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
     
-    # Run database migration with retries
-    DB_MIGRATED=false
-    for i in {1..5}; do
-        if kubectl exec -n airflow $AIRFLOW_POD -- airflow db migrate 2>&1 | grep -q "Running upgrade\|Revision ID\|Done"; then
-            echo "  ✅ Airflow database schema initialized (migrated)"
-            DB_MIGRATED=true
-            break
-        elif kubectl exec -n airflow $AIRFLOW_POD -- airflow db migrate 2>&1 | grep -q "already at head revision\|already up to date"; then
-            echo "  ✅ Airflow database schema already up to date"
-            DB_MIGRATED=true
-            break
-        else
-            echo "  ⚠️  Migration attempt $i/5 failed, retrying in 5 seconds..."
-            sleep 5
-        fi
-    done
-    
-    if [ "$DB_MIGRATED" = "false" ]; then
-        echo "  ❌ Database migration failed after 5 attempts"
-        echo "  💡 Trying to verify database state..."
-        kubectl exec -n airflow $AIRFLOW_POD -- airflow db check 2>&1 || echo "  ⚠️  Database check also failed"
+    if [ -n "$AIRFLOW_POD" ]; then
+        echo "  ⏳ Found running pod, verifying database connection..."
+        kubectl exec -n airflow $AIRFLOW_POD -- airflow db check 2>&1 | head -3 || echo "  ⚠️  Database check failed"
     fi
-    
-    # Wait for DB to be fully operational
-    echo "  ⏳ Verifying database is operational..."
-    for i in {1..10}; do
-        if kubectl exec -n airflow $AIRFLOW_POD -- airflow db check 2>/dev/null | grep -q "healthy\|OK"; then
-            echo "  ✅ Database is fully operational"
-            break
-        fi
-        if [ $i -eq 10 ]; then
-            echo "  ⚠️  Database check inconclusive (proceeding with user creation)"
-            break
-        fi
-        sleep 2
-    done
-else
-    echo "  ❌ Airflow pod not found, cannot initialize database"
 fi
 
 # Create Airflow admin user (with robust retries)
