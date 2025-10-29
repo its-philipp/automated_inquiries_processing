@@ -26,6 +26,6 @@ kind delete cluster --name cncf-cluster
 echo -e "${GREEN}✅ Complete CNCF stack stopped${NC}"
 echo ""
 echo -e "${YELLOW}💡 To restart complete CNCF stack later, run:${NC}"
-echo "  ./start-cncf.sh"
+echo "  ./start-linux.sh or ./start-macos.sh"
 echo ""
 echo -e "${BLUE}📊 All CNCF services stopped - CPU usage should be minimal now${NC}"

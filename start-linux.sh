@@ -376,17 +376,7 @@ spec:
 EOF
 echo "  ✅ PostgreSQL DNS alias created"
 
-# Initialize Airflow database schema BEFORE deploying pods
-echo "  🗄️  Initializing Airflow database schema FIRST..."
-kubectl run airflow-init --restart=Never --image=airflow-ml:2.7.3 -n airflow \
-  --env="AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql://postgres:postgres@postgresql.inquiries-system.svc.cluster.local:5432/airflow" \
-  -- airflow db init 2>/dev/null || echo "  ⚠️  Database might already be initialized"
-
-kubectl wait --for=condition=complete job/airflow-init -n airflow --timeout=60s 2>/dev/null || kubectl wait --for=condition=ready pod/airflow-init -n airflow --timeout=60s 2>/dev/null || true
-kubectl delete pod airflow-init -n airflow 2>/dev/null || true
-echo "  ✅ Airflow database schema initialized"
-
-# Create ConfigMaps
+# Create ConfigMaps BEFORE deploying pods
 echo "  📋 Creating ConfigMaps..."
 kubectl create configmap airflow-dags --from-file=airflow/dags/ -n airflow --dry-run=client -o yaml | kubectl apply -f - 2>/dev/null || true
 echo "  ✅ ConfigMaps created"
@@ -395,58 +385,164 @@ echo "  ✅ ConfigMaps created"
 echo "  🚀 Deploying Airflow..."
 kubectl apply -f k8s/airflow/airflow-with-dags-fix.yaml
 
-# Wait for Airflow to be ready
-echo "  ⏳ Waiting for Airflow pods to be ready..."
-kubectl wait --for=condition=ready pod -l app=airflow-webserver -n airflow --timeout=120s
-kubectl wait --for=condition=ready pod -l app=airflow-scheduler -n airflow --timeout=120s
+# Wait for Airflow to be ready (with longer timeout and retries)
+echo "  ⏳ Waiting for Airflow pods to be ready (this may take 2-3 minutes)..."
+for i in {1..6}; do
+    if kubectl wait --for=condition=ready pod -l app=airflow-webserver -n airflow --timeout=60s 2>/dev/null; then
+        echo "  ✅ Airflow webserver ready"
+        break
+    else
+        if [ $i -lt 6 ]; then
+            echo "  ⚠️  Webserver not ready yet, waiting... (attempt $i/6)"
+            sleep 10
+        else
+            echo "  ⚠️  Webserver still not ready, but continuing..."
+        fi
+    fi
+done
 
-# Wait a bit more for Airflow to fully initialize after pods are ready
-echo "  ⏳ Waiting for Airflow to fully initialize..."
-sleep 10
+for i in {1..6}; do
+    if kubectl wait --for=condition=ready pod -l app=airflow-scheduler -n airflow --timeout=60s 2>/dev/null; then
+        echo "  ✅ Airflow scheduler ready"
+        break
+    else
+        if [ $i -lt 6 ]; then
+            echo "  ⚠️  Scheduler not ready yet, waiting... (attempt $i/6)"
+            sleep 10
+        else
+            echo "  ⚠️  Scheduler still not ready, but continuing..."
+        fi
+    fi
+done
 
-# Get Airflow pod for admin user creation
+# Wait for pods to stabilize
+echo "  ⏳ Waiting for pods to stabilize..."
+sleep 15
+
+# Get Airflow pod for database migration and admin user creation
 AIRFLOW_POD=$(kubectl get pods -n airflow -l app=airflow-webserver -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 
-# Create Airflow admin user
+# Initialize Airflow database schema (run inside the running pod, like macOS)
+echo "  🗄️  Initializing Airflow database schema..."
+if [ -n "$AIRFLOW_POD" ]; then
+    # Wait for pod to be actually ready to accept commands
+    for i in {1..30}; do
+        if kubectl exec -n airflow $AIRFLOW_POD -- airflow version 2>/dev/null | grep -q "2.7.3"; then
+            echo "  ✅ Pod is ready to accept commands"
+            break
+        fi
+        if [ $i -eq 30 ]; then
+            echo "  ⚠️  Pod not responding, but will try migration anyway..."
+        else
+            sleep 2
+        fi
+    done
+    
+    # Run database migration with retries
+    DB_MIGRATED=false
+    for i in {1..5}; do
+        if kubectl exec -n airflow $AIRFLOW_POD -- airflow db migrate 2>&1 | grep -q "Running upgrade\|Revision ID\|Done"; then
+            echo "  ✅ Airflow database schema initialized (migrated)"
+            DB_MIGRATED=true
+            break
+        elif kubectl exec -n airflow $AIRFLOW_POD -- airflow db migrate 2>&1 | grep -q "already at head revision\|already up to date"; then
+            echo "  ✅ Airflow database schema already up to date"
+            DB_MIGRATED=true
+            break
+        else
+            echo "  ⚠️  Migration attempt $i/5 failed, retrying in 5 seconds..."
+            sleep 5
+        fi
+    done
+    
+    if [ "$DB_MIGRATED" = "false" ]; then
+        echo "  ❌ Database migration failed after 5 attempts"
+        echo "  💡 Trying to verify database state..."
+        kubectl exec -n airflow $AIRFLOW_POD -- airflow db check 2>&1 || echo "  ⚠️  Database check also failed"
+    fi
+    
+    # Wait for DB to be fully operational
+    echo "  ⏳ Verifying database is operational..."
+    for i in {1..10}; do
+        if kubectl exec -n airflow $AIRFLOW_POD -- airflow db check 2>/dev/null | grep -q "healthy\|OK"; then
+            echo "  ✅ Database is fully operational"
+            break
+        fi
+        if [ $i -eq 10 ]; then
+            echo "  ⚠️  Database check inconclusive (proceeding with user creation)"
+            break
+        fi
+        sleep 2
+    done
+else
+    echo "  ❌ Airflow pod not found, cannot initialize database"
+fi
+
+# Create Airflow admin user (with robust retries)
 echo "  👤 Creating Airflow admin user..."
 if [ -n "$AIRFLOW_POD" ]; then
+    # Wait for Airflow to be fully ready to accept user commands
+    echo "  ⏳ Waiting for Airflow to be ready for user management..."
+    for i in {1..20}; do
+        if kubectl exec -n airflow $AIRFLOW_POD -- airflow users list 2>/dev/null | grep -q "username\|Users"; then
+            echo "  ✅ Airflow is ready for user management"
+            break
+        fi
+        if [ $i -lt 20 ]; then
+            sleep 3
+        fi
+    done
+    
     # Check if admin user already exists
     if kubectl exec -n airflow $AIRFLOW_POD -- airflow users list 2>/dev/null | grep -q "admin"; then
         echo "  ✅ Admin user already exists"
     else
-        # Create admin user with proper error handling
-        if kubectl exec -n airflow $AIRFLOW_POD -- airflow users create \
-          --username admin \
-          --firstname Admin \
-          --lastname User \
-          --role Admin \
-          --email admin@example.com \
-          --password admin 2>&1 | grep -q "created\|Added user"; then
-            echo "  ✅ Admin user created successfully"
-        else
-            echo "  ⚠️  Failed to create admin user, retrying..."
-            sleep 5
-            if kubectl exec -n airflow $AIRFLOW_POD -- airflow users create \
+        # Create admin user with proper error handling and multiple retries
+        USER_CREATED=false
+        for i in {1..5}; do
+            OUTPUT=$(kubectl exec -n airflow $AIRFLOW_POD -- airflow users create \
               --username admin \
               --firstname Admin \
               --lastname User \
               --role Admin \
               --email admin@example.com \
-              --password admin 2>&1 | grep -q "created\|Added user"; then
-                echo "  ✅ Admin user created on retry"
+              --password admin 2>&1)
+            
+            if echo "$OUTPUT" | grep -q "created\|Added user\|Successfully added"; then
+                echo "  ✅ Admin user created successfully (attempt $i/5)"
+                USER_CREATED=true
+                break
+            elif echo "$OUTPUT" | grep -q "already exists"; then
+                echo "  ✅ Admin user already exists"
+                USER_CREATED=true
+                break
             else
-                echo "  ⚠️  Could not create admin user - you can create it manually later"
-                echo "  💡 Run: kubectl exec -n airflow \$AIRFLOW_POD -- airflow users create --username admin --password admin --role Admin"
+                if [ $i -lt 5 ]; then
+                    echo "  ⚠️  User creation attempt $i/5 failed, retrying in 5 seconds..."
+                    echo "     Error: $(echo "$OUTPUT" | tail -1)"
+                    sleep 5
+                else
+                    echo "  ⚠️  Could not create admin user after 5 attempts"
+                    echo "     Last error: $(echo "$OUTPUT" | tail -3)"
+                fi
             fi
+        done
+        
+        # Verify user was created
+        if [ "$USER_CREATED" = "false" ]; then
+            echo "  ⏳ Verifying if user exists anyway..."
+            sleep 3
+        fi
+        
+        if kubectl exec -n airflow $AIRFLOW_POD -- airflow users list 2>/dev/null | grep -q "admin"; then
+            echo "  ✅ Admin user verified in database"
+        else
+            echo "  ❌ Admin user creation failed!"
+            echo "  💡 Run manually: kubectl exec -n airflow $AIRFLOW_POD -- airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin"
         fi
     fi
-    
-    # Verify user was created
-    if kubectl exec -n airflow $AIRFLOW_POD -- airflow users list 2>/dev/null | grep -q "admin"; then
-        echo "  ✅ Admin user verified in database"
-    else
-        echo "  ❌ Admin user creation failed!"
-    fi
+else
+    echo "  ❌ Airflow pod not found, cannot create admin user"
 fi
 
 # Unpause all DAGs
