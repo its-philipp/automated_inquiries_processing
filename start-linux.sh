@@ -561,10 +561,10 @@ echo "  🔌 Setting up port forwarding with proper wait times..."
 
 # Wait for pods to be fully ready before port-forwarding
 echo "  ⏳ Ensuring all pods are fully ready..."
-kubectl wait --for=condition=ready pod -l app=streamlit-dashboard -n inquiries-system --timeout=30s 2>/dev/null || echo "  ⚠️  Streamlit pod not ready yet"
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=grafana -n monitoring --timeout=30s 2>/dev/null || echo "  ⚠️  Grafana pod not ready yet"
-kubectl wait --for=condition=ready pod -l app=airflow-webserver -n airflow --timeout=30s 2>/dev/null || echo "  ⚠️  Airflow pod not ready yet"
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=argocd-server -n argocd --timeout=30s 2>/dev/null || echo "  ⚠️  ArgoCD pod not ready yet"
+kubectl wait --for=condition=ready pod -l app=streamlit-dashboard -n inquiries-system --timeout=120s 2>/dev/null || echo "  ⚠️  Streamlit pod not ready yet"
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=grafana -n monitoring --timeout=120s 2>/dev/null || echo "  ⚠️  Grafana pod not ready yet"
+kubectl wait --for=condition=ready pod -l app=airflow-webserver -n airflow --timeout=120s 2>/dev/null || echo "  ⚠️  Airflow pod not ready yet"
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=argocd-server -n argocd --timeout=120s 2>/dev/null || echo "  ⚠️  ArgoCD pod not ready yet"
 
 sleep 5  # Extra time for services to stabilize
 
@@ -589,6 +589,9 @@ echo "  🔌 Starting FastAPI port-forward..."
 nohup kubectl port-forward -n inquiries-system svc/fastapi 8000:8000 > /tmp/pf-fastapi.log 2>&1 &
 sleep 5  # Extra time for all to stabilize
 
+# Start port-forward monitor to auto-restart if any die
+nohup ./keep-port-forwards-alive.sh > /tmp/pf-monitor.log 2>&1 &
+
 # Verify port forwards are running
 echo "  🔍 Verifying port forwards..."
 PORT_FORWARDS=$(ps aux | grep "kubectl port-forward" | grep -v grep | wc -l)
@@ -600,23 +603,43 @@ else
     echo "  💡 Run: ./keep-port-forwards-alive.sh in another terminal"
 fi
 
-# Verify services are accessible
+# Verify services are accessible with retries (up to ~2 minutes)
 echo "  🔍 Verifying service accessibility..."
-sleep 5  # Give services time to stabilize
 
-if curl -s -o /dev/null -w "%{http_code}" http://localhost:8501/ | grep -q "200"; then
+# Streamlit
+STREAMLIT_READY="false"
+for i in {1..60}; do
+    CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8501/ || true)
+    if echo "$CODE" | grep -q "200"; then STREAMLIT_READY="true"; break; fi
+    sleep 2
+done
+if [ "$STREAMLIT_READY" = "true" ]; then
     echo "  ✅ Streamlit dashboard accessible at http://localhost:8501"
 else
     echo "  ⚠️  Streamlit dashboard starting up (may take a minute)..."
 fi
 
-if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/ | grep -q "200\|302"; then
+# Grafana
+GRAFANA_READY="false"
+for i in {1..60}; do
+    CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/ || true)
+    if echo "$CODE" | grep -q "200\|302"; then GRAFANA_READY="true"; break; fi
+    sleep 2
+done
+if [ "$GRAFANA_READY" = "true" ]; then
     echo "  ✅ Grafana accessible at http://localhost:3000"
 else
     echo "  ⚠️  Grafana starting up..."
 fi
 
-if curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/ | grep -q "200\|302"; then
+# Airflow
+AIRFLOW_READY="false"
+for i in {1..60}; do
+    CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/ || true)
+    if echo "$CODE" | grep -q "200\|302"; then AIRFLOW_READY="true"; break; fi
+    sleep 2
+done
+if [ "$AIRFLOW_READY" = "true" ]; then
     echo "  ✅ Airflow accessible at http://localhost:8080"
 else
     echo "  ⚠️  Airflow starting up..."
