@@ -8,7 +8,7 @@ metadata:
     version: v2.0-gitops  # GitOps demo version
     managed-by: argocd
 spec:
-  replicas: 2  # Scale to 2 for high availability!
+  replicas: 1  # Single replica for resource efficiency
   selector:
     matchLabels:
       app: streamlit-dashboard
@@ -21,15 +21,10 @@ spec:
     spec:
       containers:
       - name: streamlit-dashboard
-        image: python:3.11-slim
+        image: streamlit-app:1.0.0
+        imagePullPolicy: Never  # Use locally built image in Kind
         ports:
         - containerPort: 8501
-        command: ["/bin/bash", "-c"]
-        args:
-          - |
-            pip install streamlit pandas plotly sqlalchemy psycopg2-binary
-            cd /app
-            streamlit run inquiry_monitoring_dashboard.py --server.port=8501 --server.address=0.0.0.0
         env:
         - name: DATABASE_URL
           value: "postgresql://postgres:postgres@postgresql.inquiries-system.svc.cluster.local:5432/inquiry_automation"
@@ -37,20 +32,25 @@ spec:
           value: "8501"
         - name: STREAMLIT_SERVER_ADDRESS
           value: "0.0.0.0"
-        volumeMounts:
-        - name: app-code
-          mountPath: /app
         resources:
           requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
             memory: "512Mi"
             cpu: "250m"
-          limits:
-            memory: "1Gi"
-            cpu: "500m"
-      volumes:
-      - name: app-code
-        configMap:
-          name: streamlit-app-code
+        readinessProbe:
+          httpGet:
+            path: /_stcore/health
+            port: 8501
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /_stcore/health
+            port: 8501
+          initialDelaySeconds: 15
+          periodSeconds: 10
 ---
 apiVersion: v1
 kind: Service

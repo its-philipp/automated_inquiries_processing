@@ -144,10 +144,21 @@ else
     echo "  ✅ Custom FastAPI image already exists"
 fi
 
+# Build custom Streamlit image with pre-installed dependencies
+echo -e "${BLUE}📊 Building custom Streamlit image...${NC}"
+if ! docker images | grep -q "streamlit-app.*1.0.0"; then
+    echo "  📦 Building streamlit-app:1.0.0 (this may take 2-3 minutes)..."
+    docker build -t streamlit-app:1.0.0 -f docker/streamlit-app.Dockerfile . 
+    echo "  ✅ Custom Streamlit image built"
+else
+    echo "  ✅ Custom Streamlit image already exists"
+fi
+
 # Load custom images into Kind cluster
 echo "  📤 Loading custom images into Kind cluster..."
 kind load docker-image airflow-ml:2.7.3 --name cncf-cluster
 kind load docker-image fastapi-app:1.0.0 --name cncf-cluster
+kind load docker-image streamlit-app:1.0.0 --name cncf-cluster
 echo -e "${GREEN}✅ Custom images loaded into Kind cluster${NC}"
 
 # Create namespaces
@@ -394,7 +405,7 @@ echo "  ⏳ Creating database initialization pod..."
 kubectl run airflow-db-init --restart=Never --image=airflow-ml:2.7.3 -n airflow \
   --env="AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql://postgres:postgres@postgresql.inquiries-system.svc.cluster.local:5432/airflow" \
   --env="AIRFLOW__CORE__EXECUTOR=LocalExecutor" \
-  -- airflow db migrate
+  -- airflow db init
 
 # Wait for the pod to complete (with proper timeout and error handling)
 echo "  ⏳ Waiting for database initialization to complete (this may take 30-60 seconds)..."
@@ -712,6 +723,23 @@ kubectl wait --for=condition=ready pod -l app=streamlit-dashboard -n inquiries-s
 kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=grafana -n monitoring --timeout=120s 2>/dev/null || echo "  ⚠️  Grafana pod not ready yet"
 kubectl wait --for=condition=ready pod -l app=airflow-webserver -n airflow --timeout=120s 2>/dev/null || echo "  ⚠️  Airflow pod not ready yet"
 kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=argocd-server -n argocd --timeout=120s 2>/dev/null || echo "  ⚠️  ArgoCD pod not ready yet"
+
+# Wait for Streamlit app to be fully started (not just pod ready)
+echo "  ⏳ Waiting for Streamlit app to fully initialize..."
+for i in {1..30}; do
+    STREAMLIT_POD=$(kubectl get pods -n inquiries-system -l app=streamlit-dashboard -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+    if [ -n "$STREAMLIT_POD" ]; then
+        # Check if Streamlit is responding on its health endpoint
+        if kubectl exec -n inquiries-system $STREAMLIT_POD -- curl -s http://localhost:8501/_stcore/health 2>/dev/null | grep -q "ok"; then
+            echo "  ✅ Streamlit app is fully initialized"
+            break
+        fi
+    fi
+    if [ $i -eq 30 ]; then
+        echo "  ⚠️  Streamlit may still be starting up"
+    fi
+    sleep 2
+done
 
 sleep 5  # Extra time for services to stabilize
 

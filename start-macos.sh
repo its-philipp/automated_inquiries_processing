@@ -185,10 +185,21 @@ else
     echo "  ✅ Custom FastAPI image already exists"
 fi
 
+# Build custom Streamlit image with pre-installed dependencies
+echo -e "${BLUE}📊 Building custom Streamlit image...${NC}"
+if ! docker images | grep -q "streamlit-app.*1.0.0"; then
+    echo "  📦 Building streamlit-app:1.0.0 (this may take 2-3 minutes)..."
+    docker build -t streamlit-app:1.0.0 -f docker/streamlit-app.Dockerfile . 
+    echo "  ✅ Custom Streamlit image built"
+else
+    echo "  ✅ Custom Streamlit image already exists"
+fi
+
 # Load custom images into Kind cluster
 echo "  📤 Loading custom images into Kind cluster..."
 kind load docker-image airflow-ml:2.7.3 --name cncf-cluster
 kind load docker-image fastapi-app:1.0.0 --name cncf-cluster
+kind load docker-image streamlit-app:1.0.0 --name cncf-cluster
 echo -e "${GREEN}✅ Custom images loaded into Kind cluster${NC}"
 
 # Create namespaces
@@ -426,6 +437,35 @@ kubectl create configmap streamlit-app-code --from-file=inquiry_monitoring_dashb
 kubectl create configmap airflow-dags --from-file=airflow/dags/batch_classify.py --from-file=airflow/dags/daily_ingestion.py --from-file=airflow/dags/model_retrain.py -n airflow 2>/dev/null || true
 echo "  ✅ ConfigMaps created"
 
+# Initialize Airflow database BEFORE deploying Airflow
+echo "  🗄️  Initializing Airflow database (must be done before pods start)..."
+cat <<EOF | kubectl apply -f -
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: airflow-db-init
+  namespace: airflow
+spec:
+  template:
+    spec:
+      containers:
+      - name: airflow-db-init
+        image: airflow-ml:2.7.3
+        imagePullPolicy: Never
+        command: ["airflow", "db", "init"]
+        env:
+        - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+          value: "postgresql://postgres:postgres@postgresql.inquiries-system.svc.cluster.local:5432/airflow"
+        - name: AIRFLOW__CORE__EXECUTOR
+          value: "LocalExecutor"
+      restartPolicy: Never
+  backoffLimit: 1
+EOF
+echo "  ⏳ Waiting for Airflow database initialization..."
+kubectl wait --for=condition=complete job/airflow-db-init -n airflow --timeout=120s 2>/dev/null || echo "  ⚠️  DB init may have already been done"
+kubectl delete job/airflow-db-init -n airflow 2>/dev/null || true
+echo "  ✅ Airflow database initialized"
+
 # Deploy Airflow using optimized YAML with custom image and increased memory
 kubectl apply -f k8s/airflow/airflow-with-dags-fix.yaml
 
@@ -628,10 +668,27 @@ echo "  🔌 Setting up port forwarding with proper wait times..."
 
 # Wait for pods to be fully ready before port-forwarding
 echo "  ⏳ Ensuring all pods are fully ready..."
-kubectl wait --for=condition=ready pod -l app=streamlit-dashboard -n inquiries-system --timeout=30s 2>/dev/null || echo "  ⚠️  Streamlit pod not ready yet"
+kubectl wait --for=condition=ready pod -l app=streamlit-dashboard -n inquiries-system --timeout=60s 2>/dev/null || echo "  ⚠️  Streamlit pod not ready yet"
 kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=grafana -n monitoring --timeout=30s 2>/dev/null || echo "  ⚠️  Grafana pod not ready yet"
 kubectl wait --for=condition=ready pod -l app=airflow-webserver -n airflow --timeout=30s 2>/dev/null || echo "  ⚠️  Airflow pod not ready yet"
 kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=argocd-server -n argocd --timeout=30s 2>/dev/null || echo "  ⚠️  ArgoCD pod not ready yet"
+
+# Wait for Streamlit app to be fully started (not just pod ready)
+echo "  ⏳ Waiting for Streamlit app to fully initialize..."
+for i in {1..30}; do
+    STREAMLIT_POD=$(kubectl get pods -n inquiries-system -l app=streamlit-dashboard -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+    if [ -n "$STREAMLIT_POD" ]; then
+        # Check if Streamlit is responding on its health endpoint
+        if kubectl exec -n inquiries-system $STREAMLIT_POD -- curl -s http://localhost:8501/_stcore/health 2>/dev/null | grep -q "ok"; then
+            echo "  ✅ Streamlit app is fully initialized"
+            break
+        fi
+    fi
+    if [ $i -eq 30 ]; then
+        echo "  ⚠️  Streamlit may still be starting up"
+    fi
+    sleep 2
+done
 
 sleep 5  # Extra time for services to stabilize
 
