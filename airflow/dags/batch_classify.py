@@ -149,48 +149,48 @@ def classify_inquiries(**context):
         for inquiry in inquiries:
             text = f"{inquiry.get('subject', '')} {inquiry.get('body', '')}".lower()
         
-        # Category classification
-        if any(word in text for word in ['billing', 'charge', 'payment', 'invoice']):
-            category = 'billing'
-            category_confidence = 0.85
-        elif any(word in text for word in ['technical', 'error', 'bug', 'not working', 'login']):
-            category = 'technical_support'
-            category_confidence = 0.85
-        elif any(word in text for word in ['sales', 'pricing', 'demo', 'enterprise']):
-            category = 'sales'
-            category_confidence = 0.85
-        elif any(word in text for word in ['hr', 'benefits', 'leave', 'policy']):
-            category = 'hr'
-            category_confidence = 0.85
-        elif any(word in text for word in ['legal', 'terms', 'privacy', 'compliance']):
-            category = 'legal'
-            category_confidence = 0.85
-        else:
-            category = 'product_feedback'
-            category_confidence = 0.60
-        
-        # Sentiment classification
-        if any(word in text for word in ['love', 'great', 'excellent', 'wonderful', 'thank']):
-            sentiment = 'positive'
-            sentiment_confidence = 0.80
-        elif any(word in text for word in ['hate', 'terrible', 'awful', 'worst', 'angry']):
-            sentiment = 'negative'
-            sentiment_confidence = 0.80
-        else:
-            sentiment = 'neutral'
-            sentiment_confidence = 0.75
-        
-        # Urgency classification
-        if any(word in text for word in ['urgent', 'asap', 'emergency', 'critical', 'immediately']):
-            urgency = 'critical'
-            urgency_confidence = 0.90
-        elif any(word in text for word in ['important', 'soon', 'priority']):
-            urgency = 'high'
-            urgency_confidence = 0.80
-        else:
-            urgency = 'medium'
-            urgency_confidence = 0.70
-        
+            # Category classification
+            if any(word in text for word in ['billing', 'charge', 'payment', 'invoice']):
+                category = 'billing'
+                category_confidence = 0.85
+            elif any(word in text for word in ['technical', 'error', 'bug', 'not working', 'login']):
+                category = 'technical_support'
+                category_confidence = 0.85
+            elif any(word in text for word in ['sales', 'pricing', 'demo', 'enterprise']):
+                category = 'sales'
+                category_confidence = 0.85
+            elif any(word in text for word in ['hr', 'benefits', 'leave', 'policy']):
+                category = 'hr'
+                category_confidence = 0.85
+            elif any(word in text for word in ['legal', 'terms', 'privacy', 'compliance']):
+                category = 'legal'
+                category_confidence = 0.85
+            else:
+                category = 'product_feedback'
+                category_confidence = 0.60
+            
+            # Sentiment classification
+            if any(word in text for word in ['love', 'great', 'excellent', 'wonderful', 'thank']):
+                sentiment = 'positive'
+                sentiment_confidence = 0.80
+            elif any(word in text for word in ['hate', 'terrible', 'awful', 'worst', 'angry']):
+                sentiment = 'negative'
+                sentiment_confidence = 0.80
+            else:
+                sentiment = 'neutral'
+                sentiment_confidence = 0.75
+            
+            # Urgency classification
+            if any(word in text for word in ['urgent', 'asap', 'emergency', 'critical', 'immediately']):
+                urgency = 'critical'
+                urgency_confidence = 0.90
+            elif any(word in text for word in ['important', 'soon', 'priority']):
+                urgency = 'high'
+                urgency_confidence = 0.80
+            else:
+                urgency = 'medium'
+                urgency_confidence = 0.70
+            
             predictions.append({
                 'inquiry_id': inquiry['id'],
                 'category': category,
